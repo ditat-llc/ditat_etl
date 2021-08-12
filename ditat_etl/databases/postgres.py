@@ -22,6 +22,32 @@ class Postgres:
         'date': 'datetime64',
         'jsonb': dict,
     }
+    SF_TO_POSTGRES_TYPES = {
+        # 'anytype': 'text',
+        'anytype': 'varchar',
+        # 'base64': 'text',
+        'base64': 'varchar',
+        'boolean': 'boolean',
+        'combobox': 'varchar',
+        'currency': 'numeric',
+        'datacategorygroupreference': 'varchar',
+        'date': 'date',
+        'datetime': 'timestamp',
+        'double': 'numeric',
+        'email': 'varchar',
+        'encryptedstring': 'varchar',
+        'id': 'varchar',
+        'int': 'integer',
+        'multipicklist': 'varchar',
+        'percent': 'numeric',
+        'phone': 'varchar',
+        'picklist': 'varchar',
+        'reference': 'varchar',
+        'string': 'varchar',
+        'textarea': 'varchar',
+        'time': 'time',
+        'url': 'varchar'
+    }
 
     def __init__(self, config, keep_connection_alive=False):
         '''
@@ -232,8 +258,8 @@ class Postgres:
 
     def insert_df_to_sql(
         self,
-        df,
-        tablename,
+        df: pd.DataFrame,
+        tablename: str,
         commit=True,
         conflict_on: list=None,
         do_update_columns: bool or list=False,
@@ -294,8 +320,8 @@ class Postgres:
 
     def update_df_to_sql(
         self,
-        df,
-        tablename,
+        df: pd.DataFrame,
+        tablename: str,
         on_columns: str or list,
         insert_new=True,
         commit=True,
@@ -465,52 +491,5 @@ class Postgres:
             commit=True,
             verbose=True
         )
-
-    ### THE FOLLOWING METHODS ARE CUSTOM FOR A PROPRIETARY PROCESS ####
-    @table_exists
-    def update_table(self, tablename, path, sep, columns, pk):
-        conn = psycopg2.connect(**self.config)
-        conn.autocommit = True
-        cursor = conn.cursor()
-
-        with open(path, 'r') as file:
-            next(file)
-            cursor.copy_from(file, tablename, null='None', sep=sep, columns=columns)
-
-        self.delete_duplicates(tablename=tablename, id=pk, cursor=cursor)
-
-        self.update_sort_id(tablename=tablename, cursor=cursor)
-
-        cursor.close()
-        conn.close()
-
-    def delete_duplicates(self, tablename, cursor, id, sort_col='sort_id'):
-        # Careful with SQL INJECTION. Needs to be fixed.
-        delete_query = '''
-            DELETE FROM
-                {0} AS a
-            USING
-                {0} AS b
-            WHERE
-                a.{1} < b.{1}
-            AND
-                a.{2} = b.{2}
-        ;'''.format(
-            tablename,
-            sort_col,
-            id
-        )
-        cursor.execute(delete_query)
-
-    def update_sort_id(self, tablename, cursor, sort_col='sort_id'):
-        # change due to SQL Injection
-        update_sort_query = f'''
-            UPDATE
-                {tablename}
-            SET
-                {sort_col} = 0
-        ;'''
-        cursor.execute(update_sort_query)
-
 
 
