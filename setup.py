@@ -11,9 +11,10 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	name='ditat_etl',
-	version='0.0.6',
+	version='0.0.7',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	include_package_data=True,
+	package_data={'ditat_etl': ['url/proxies.json']},
 	python_requires='>=3.7',
 	install_requires=[
 		'pandas',
