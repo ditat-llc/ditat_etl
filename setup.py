@@ -11,12 +11,15 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	name='ditat_etl',
-	version='0.0.4',
+	version='0.0.5',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	python_requires='>=3.7',
 	install_requires=[
 		'pandas',
-		'psycopg2-binary'
+		'psycopg2-binary',
+		'requests',
+		'pysocks'
+
 	]
 
 )
