@@ -15,6 +15,53 @@ f()
 ```bash
 f time: 0.1
 ```
+## Url
+Extension of module requests/urllib3 for Proxy usage and Bulk usage.
+
+### _Url_
+```python
+u = Url()
+```
+We use the logging module and it is set by default with 'DEBUG'.
+You can change this parameter to any allowed level
+```python3
+u = Url(debug_level='WARNING') # Just an example
+```
+Manage your proxies
+```python
+u.add_proxies(n=3) # Added 3 new proxies (not necessarily valid) to self.proxies
+
+u.clean_proxies() # Multithreaded to validate and keep only valid proxies.
+```
+```python
+print(u.proxies)
+# You can also u.proxies = [], set them manually but this is not recommended.
+```
+
+#### Main functionality
+```python
+def request(
+    self,
+    queue: str or list,
+    expected_status_code: int=200,
+    n_times: int=1,
+    max_retries: int=None,
+    use_proxy=False,
+    _raise=True,
+    ***kwargs
+    ):
+```
+Examples
+```python
+
+result = u.request('https://google.com')
+
+result = u.request(queue=['https://google.com', 'htttps://facebook.com'], use_proxy=True)
+
+# You can also pass optional parameter valid por a requests "Request"
+result = u.request(queue='https://example.com', method='post', data={'hello': 'world'})
+```
+
 
 ## Databases
 Useful wrappers for databases and methods to execute queries.
