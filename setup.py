@@ -13,6 +13,7 @@ setup(
 	name='ditat_etl',
 	version='0.0.5',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
+	include_package_data=True,
 	python_requires='>=3.7',
 	install_requires=[
 		'pandas',
