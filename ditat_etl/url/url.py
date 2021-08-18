@@ -35,7 +35,8 @@ class Url:
         timeout: int=15,
         debug_level: str='DEBUG',
         max_workers: int=min(32, os.cpu_count() + 4),
-        proxies_filepath: str= os.path.join(filedir, 'proxies.json')
+        proxies_filepath: str= os.path.join(filedir, 'proxies.json'),
+        add_proxies: int=2
         ):
         '''
         Args:
@@ -45,6 +46,7 @@ class Url:
                 multithreading. Documentation suggests this default according to server's capabilities.
             - proxies_filepath (str, default=os.path.join(filedir, 'proxies.json'):
                 Dynamic file for proxies. Used for property "proxies"
+            - add_proxies (int, default=2): Using the local server ip, add n proxies to self.proxies
         Returns:
             - None
         '''
@@ -54,9 +56,12 @@ class Url:
         self.load_logger(debug_level=debug_level)
         # self.ip = self.get_local_ip()
 
+        if add_proxies:
+            self.add_proxies(add_proxies)
+
     def load_logger(
         self,
-        debug_level: str='INFO'
+        debug_level: str='DEBUG'
         ):
         '''
         Complete setup for built-in logging module. This is a local implementation.
@@ -84,7 +89,7 @@ class Url:
         with open(self.proxies_filepath, 'r') as f:
             proxies = json.loads(f.read())
             random.shuffle(proxies)
-            self.logger.info(f'Read proxies n={len(proxies)}')
+            # self.logger.info(f'Read proxies n={len(proxies)}')
             return proxies
 
     @proxies.setter
