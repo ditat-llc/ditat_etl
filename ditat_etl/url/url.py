@@ -36,7 +36,7 @@ class Url:
         debug_level: str='DEBUG',
         max_workers: int=min(32, os.cpu_count() + 4),
         proxies_filepath: str= os.path.join(filedir, 'proxies.json'),
-        add_proxies: int=2
+        add_proxies: int=None
         ):
         '''
         Args:
@@ -129,7 +129,6 @@ class Url:
         _raise=False,
         extra_print: Any=None,
         expected_status_code: int=None,
-        data=None,
         **kwargs
         ):
         '''
@@ -161,8 +160,8 @@ class Url:
             'proxies': {'http': proxy, 'https': proxy},
             'timeout': self.timeout if timeout is False else timeout
         }
-        if data:
-            f_payload['data'] = json.dumps(data)
+        if 'data' in kwargs:
+            kwargs['data'] = json.dumps(kwargs['data'])
         try:
             f = getattr(requests, method.lower())
             response = f(**f_payload, **kwargs)
@@ -200,7 +199,7 @@ class Url:
     def request(
         self,
         queue: str or list,
-        expected_status_code: int=200,
+        expected_status_code: int=None,
         n_times: int=1,
         max_retries: int=None,
         use_proxy=False,
