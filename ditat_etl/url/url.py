@@ -36,7 +36,8 @@ class Url:
         debug_level: str='DEBUG',
         max_workers: int=min(32, os.cpu_count() + 4),
         proxies_filepath: str= os.path.join(filedir, 'proxies.json'),
-        add_proxies: int=None
+        add_proxies: int=None,
+        **kwargs
         ):
         '''
         Args:
@@ -87,10 +88,10 @@ class Url:
         Property "proxies" is always read from file.
         '''
         with open(self.proxies_filepath, 'r') as f:
-            proxies = json.loads(f.read())
-            random.shuffle(proxies)
+            proxies_ = json.loads(f.read())
+            random.shuffle(proxies_)
             # self.logger.info(f'Read proxies n={len(proxies)}')
-            return proxies
+            return proxies_
 
     @proxies.setter
     def proxies(self, proxies):
@@ -160,8 +161,8 @@ class Url:
             'proxies': {'http': proxy, 'https': proxy},
             'timeout': self.timeout if timeout is False else timeout
         }
-        if 'data' in kwargs:
-            kwargs['data'] = json.dumps(kwargs['data'])
+        # if 'data' in kwargs:
+        #     kwargs['data'] = json.dumps(kwargs['data'])
         try:
             f = getattr(requests, method.lower())
             response = f(**f_payload, **kwargs)
