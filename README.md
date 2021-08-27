@@ -19,7 +19,19 @@ f time: 0.1
 Extension of module requests/urllib3 for Proxy usage and Bulk usage.
 
 ### _Url_
+*High-level usage*
 ```python
+from ditat_etl import url
+
+response = url.get('https://google.com')
+# You can pass the same parameters as the library requests and other special parameters.
+
+# Check low level usage for more details.
+```
+*Low-level usage*
+```python
+from ditat_etl.url import Url
+
 u = Url()
 ```
 We use the logging module and it is set by default with 'DEBUG'.
@@ -41,7 +53,6 @@ print(u.proxies)
 #### Main functionality
 ```python
 def request(
-    self,
     queue: str or list,
     expected_status_code: int=200,
     n_times: int=1,
@@ -59,7 +70,8 @@ result = u.request('https://google.com')
 result = u.request(queue=['https://google.com', 'htttps://facebook.com'], use_proxy=True)
 
 # You can also pass optional parameter valid por a requests "Request"
-result = u.request(queue='https://example.com', method='post', data={'hello': 'world'})
+import json
+result = u.request(queue='https://example.com', method='post', data=json.dumps({'hello': 'world'}))
 ```
 
 
