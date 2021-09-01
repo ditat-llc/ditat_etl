@@ -143,44 +143,50 @@ class Postgres:
                 If given more than one query, it will only return the result
                 of the last one. Order of queries is important.
         '''
-        conn = psycopg2.connect(**self.config) if not hasattr(self, 'conn') else self.conn
+        conn = psycopg2.connect(**self.config) if not self.keep_connection_alive else self.conn
         conn.autocommit = True if commit else False
+    
+        try:
+            query_statement_lst = query_statement if isinstance(query_statement, list) else [query_statement]
+            mogrify_tuple_list = mogrify_tuple if isinstance(query_statement, list) else [mogrify_tuple]
 
-        query_statement_lst = query_statement if isinstance(query_statement, list) else [query_statement]
-        mogrify_tuple_list = mogrify_tuple if isinstance(query_statement, list) else [mogrify_tuple]
+            cursor = conn.cursor(cursor_factory=RealDictCursor) if as_dict else conn.cursor()  
+            
+            for index, query_statement in enumerate(query_statement_lst):
 
-        cursor = conn.cursor(cursor_factory=RealDictCursor) if as_dict else conn.cursor()  
-        
-        for index, query_statement in enumerate(query_statement_lst):
+                if mogrify:
+                    query_statement = cursor.mogrify(
+                        query_statement,
+                        mogrify_tuple_list[index]
+                    )
 
-            if mogrify:
-                query_statement = cursor.mogrify(
-                    query_statement,
-                    mogrify_tuple_list[index]
-                )
+                if verbose:
+                    print(query_statement)
 
-            if verbose:
-                print(query_statement)
+                if returning and index == (len(query_statement_lst) - 1):
+                    # Fetching only the last query
+                    if df:
+                        results = pd.read_sql(query_statement, conn)
+                    
+                    else:
+                        cursor.execute(query_statement)
+                        results = cursor.fetchall()
 
-            if returning and index == (len(query_statement_lst) - 1):
-                # Fetching only the last query
-                if df:
-                    results = pd.read_sql(query_statement, conn)
-                
+                        if as_dict:
+                            results = [dict(i) for i in results]
                 else:
                     cursor.execute(query_statement)
-                    results = cursor.fetchall()
+                    results = cursor.statusmessage
 
-                    if as_dict:
-                        results = [dict(i) for i in results]
-            else:
-                cursor.execute(query_statement)
-                results = cursor.statusmessage
+            cursor.close()
+            return results
+        
+        except Exception as e:
+            print(e)
 
-        cursor.close()
-        if self.keep_connection_alive is False:
-            conn.close()        
-        return results
+        finally:
+            if self.keep_connection_alive is False:
+                conn.close()        
 
     @property
     def tables(self):
