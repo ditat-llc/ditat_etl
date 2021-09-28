@@ -11,7 +11,7 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	name='ditat_etl',
-	version='0.0.10',
+	version='0.0.11',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	include_package_data=True,
 	package_data={'ditat_etl': ['url/proxies.json']},
@@ -20,8 +20,8 @@ setup(
 		'pandas',
 		'psycopg2-binary',
 		'requests',
-		'pysocks'
-
+		'pysocks',
+		'selenium'
 	]
 
 )

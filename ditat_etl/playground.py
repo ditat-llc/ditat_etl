@@ -1,17 +1,9 @@
 '''
 Test stuff
 '''
+from utils.phones import Phone
 
-# from url import Url
 
-# url_instance = Url()
+print(Phone.format('7202833036', 'USA'))
 
-# resp = url_instance.request('https://google.com', n_times=5, use_proxy=True)
 
-# print(resp)
-
-import url
-
-resp = url.get('https://google.com', use_proxy=True, debug_level='DEBUG')
-resp = url.request(method='GET','https://google.com', use_proxy=True, debug_level='DEBUG')
-print(resp)

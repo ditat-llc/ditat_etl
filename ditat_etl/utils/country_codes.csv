@@ -1,0 +1,241 @@
+country,country_code,iso,iso_long
+afghanistan,93,af,afg
+albania,355,al,alb
+algeria,213,dz,dza
+american samoa,1-684,as,asm
+andorra,376,ad,and
+angola,244,ao,ago
+anguilla,1-264,ai,aia
+antarctica,672,aq,ata
+antigua and barbuda,1-268,ag,atg
+argentina,54,ar,arg
+armenia,374,am,arm
+aruba,297,aw,abw
+australia,61,au,aus
+austria,43,at,aut
+azerbaijan,994,az,aze
+bahamas,1-242,bs,bhs
+bahrain,973,bh,bhr
+bangladesh,880,bd,bgd
+barbados,1-246,bb,brb
+belarus,375,by,blr
+belgium,32,be,bel
+belize,501,bz,blz
+benin,229,bj,ben
+bermuda,1-441,bm,bmu
+bhutan,975,bt,btn
+bolivia,591,bo,bol
+bosnia and herzegovina,387,ba,bih
+botswana,267,bw,bwa
+brazil,55,br,bra
+british indian ocean territory,246,io,iot
+british virgin islands,1-284,vg,vgb
+brunei,673,bn,brn
+bulgaria,359,bg,bgr
+burkina faso,226,bf,bfa
+burundi,257,bi,bdi
+cambodia,855,kh,khm
+cameroon,237,cm,cmr
+canada,1,ca,can
+cape verde,238,cv,cpv
+cayman islands,1-345,ky,cym
+central african republic,236,cf,caf
+chad,235,td,tcd
+chile,56,cl,chl
+china,86,cn,chn
+christmas island,61,cx,cxr
+cocos islands,61,cc,cck
+colombia,57,co,col
+comoros,269,km,com
+cook islands,682,ck,cok
+costa rica,506,cr,cri
+croatia,385,hr,hrv
+cuba,53,cu,cub
+curacao,599,cw,cuw
+cyprus,357,cy,cyp
+czech republic,420,cz,cze
+democratic republic of the congo,243,cd,cod
+denmark,45,dk,dnk
+djibouti,253,dj,dji
+dominica,1-767,dm,dma
+dominican republic,"1-809, 1-829, 1-849",do,dom
+east timor,670,tl,tls
+ecuador,593,ec,ecu
+egypt,20,eg,egy
+el salvador,503,sv,slv
+equatorial guinea,240,gq,gnq
+eritrea,291,er,eri
+estonia,372,ee,est
+ethiopia,251,et,eth
+falkland islands,500,fk,flk
+faroe islands,298,fo,fro
+fiji,679,fj,fji
+finland,358,fi,fin
+france,33,fr,fra
+french polynesia,689,pf,pyf
+gabon,241,ga,gab
+gambia,220,gm,gmb
+georgia,995,ge,geo
+germany,49,de,deu
+ghana,233,gh,gha
+gibraltar,350,gi,gib
+greece,30,gr,grc
+greenland,299,gl,grl
+grenada,1-473,gd,grd
+guam,1-671,gu,gum
+guatemala,502,gt,gtm
+guernsey,44-1481,gg,ggy
+guinea,224,gn,gin
+guinea-bissau,245,gw,gnb
+guyana,592,gy,guy
+haiti,509,ht,hti
+honduras,504,hn,hnd
+hong kong,852,hk,hkg
+hungary,36,hu,hun
+iceland,354,is,isl
+india,91,in,ind
+indonesia,62,id,idn
+iran,98,ir,irn
+iraq,964,iq,irq
+ireland,353,ie,irl
+isle of man,44-1624,im,imn
+israel,972,il,isr
+italy,39,it,ita
+ivory coast,225,ci,civ
+jamaica,1-876,jm,jam
+japan,81,jp,jpn
+jersey,44-1534,je,jey
+jordan,962,jo,jor
+kazakhstan,7,kz,kaz
+kenya,254,ke,ken
+kiribati,686,ki,kir
+kosovo,383,xk,xkx
+kuwait,965,kw,kwt
+kyrgyzstan,996,kg,kgz
+laos,856,la,lao
+latvia,371,lv,lva
+lebanon,961,lb,lbn
+lesotho,266,ls,lso
+liberia,231,lr,lbr
+libya,218,ly,lby
+liechtenstein,423,li,lie
+lithuania,370,lt,ltu
+luxembourg,352,lu,lux
+macau,853,mo,mac
+macedonia,389,mk,mkd
+madagascar,261,mg,mdg
+malawi,265,mw,mwi
+malaysia,60,my,mys
+maldives,960,mv,mdv
+mali,223,ml,mli
+malta,356,mt,mlt
+marshall islands,692,mh,mhl
+mauritania,222,mr,mrt
+mauritius,230,mu,mus
+mayotte,262,yt,myt
+mexico,52,mx,mex
+micronesia,691,fm,fsm
+moldova,373,md,mda
+monaco,377,mc,mco
+mongolia,976,mn,mng
+montenegro,382,me,mne
+montserrat,1-664,ms,msr
+morocco,212,ma,mar
+mozambique,258,mz,moz
+myanmar,95,mm,mmr
+namibia,264,na,nam
+nauru,674,nr,nru
+nepal,977,np,npl
+netherlands,31,nl,nld
+netherlands antilles,599,an,ant
+new caledonia,687,nc,ncl
+new zealand,64,nz,nzl
+nicaragua,505,ni,nic
+niger,227,ne,ner
+nigeria,234,ng,nga
+niue,683,nu,niu
+north korea,850,kp,prk
+northern mariana islands,1-670,mp,mnp
+norway,47,no,nor
+oman,968,om,omn
+pakistan,92,pk,pak
+palau,680,pw,plw
+palestine,970,ps,pse
+panama,507,pa,pan
+papua new guinea,675,pg,png
+paraguay,595,py,pry
+peru,51,pe,per
+philippines,63,ph,phl
+pitcairn,64,pn,pcn
+poland,48,pl,pol
+portugal,351,pt,prt
+puerto rico,"1-787, 1-939",pr,pri
+qatar,974,qa,qat
+republic of the congo,242,cg,cog
+reunion,262,re,reu
+romania,40,ro,rou
+russia,7,ru,rus
+rwanda,250,rw,rwa
+saint barthelemy,590,bl,blm
+saint helena,290,sh,shn
+saint kitts and nevis,1-869,kn,kna
+saint lucia,1-758,lc,lca
+saint martin,590,mf,maf
+saint pierre and miquelon,508,pm,spm
+saint vincent and the grenadines,1-784,vc,vct
+samoa,685,ws,wsm
+san marino,378,sm,smr
+sao tome and principe,239,st,stp
+saudi arabia,966,sa,sau
+senegal,221,sn,sen
+serbia,381,rs,srb
+seychelles,248,sc,syc
+sierra leone,232,sl,sle
+singapore,65,sg,sgp
+sint maarten,1-721,sx,sxm
+slovakia,421,sk,svk
+slovenia,386,si,svn
+solomon islands,677,sb,slb
+somalia,252,so,som
+south africa,27,za,zaf
+south korea,82,kr,kor
+south sudan,211,ss,ssd
+spain,34,es,esp
+sri lanka,94,lk,lka
+sudan,249,sd,sdn
+suriname,597,sr,sur
+svalbard and jan mayen,47,sj,sjm
+swaziland,268,sz,swz
+sweden,46,se,swe
+switzerland,41,ch,che
+syria,963,sy,syr
+taiwan,886,tw,twn
+tajikistan,992,tj,tjk
+tanzania,255,tz,tza
+thailand,66,th,tha
+togo,228,tg,tgo
+tokelau,690,tk,tkl
+tonga,676,to,ton
+trinidad and tobago,1-868,tt,tto
+tunisia,216,tn,tun
+turkey,90,tr,tur
+turkmenistan,993,tm,tkm
+turks and caicos islands,1-649,tc,tca
+tuvalu,688,tv,tuv
+u.s. virgin islands,1-340,vi,vir
+uganda,256,ug,uga
+ukraine,380,ua,ukr
+united arab emirates,971,ae,are
+united kingdom,44,gb,gbr
+united states,1,us,usa
+uruguay,598,uy,ury
+uzbekistan,998,uz,uzb
+vanuatu,678,vu,vut
+vatican,379,va,vat
+venezuela,58,ve,ven
+vietnam,84,vn,vnm
+wallis and futuna,681,wf,wlf
+western sahara,212,eh,esh
+yemen,967,ye,yem
+zambia,260,zm,zmb
+zimbabwe,263,zw,zwe
