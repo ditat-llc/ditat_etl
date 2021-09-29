@@ -11,17 +11,18 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	name='ditat_etl',
-	version='0.0.12',
+	version='0.0.14',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	include_package_data=True,
-	package_data={'ditat_etl': ['url/proxies.json']},
-	python_requires='>=3.7',
+	package_data={'ditat_etl': ['url/proxies.json', 'utils/country_codes.csv']},
+	python_requires='>=3.8',
 	install_requires=[
 		'pandas',
 		'psycopg2-binary',
 		'requests',
 		'pysocks',
-		'selenium'
+		'selenium',
+		'phonenumbers'
 	]
 
 )
