@@ -14,7 +14,13 @@ setup(
 	version='0.0.15',
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	include_package_data=True,
-	package_data={'ditat_etl': ['url/proxies.json', 'utils/country_codes.csv']},
+	package_data={
+		'ditat_etl': [
+			'url/proxies.json',
+			'utils/country_codes.csv',
+			'utils/entity_resolution/domains_ignored.txt'
+		]
+	},
 	python_requires='>=3.8',
 	install_requires=[
 		'pandas',
