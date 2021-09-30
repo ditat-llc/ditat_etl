@@ -1,9 +1,10 @@
 import json
+import os
 
 import pandas as pd
 
-from .phones import Phone
-from ..url.functions import extract_domain
+from ..phones import Phone
+from ...url.functions import extract_domain
 
 
 '''
@@ -12,6 +13,9 @@ Entity resolution matcher according to:
     - Phone
     - Address
 '''
+
+filedir = os.path.abspath(os.path.dirname(__file__))
+
 
 class Frame:
     def __init__(
@@ -39,6 +43,13 @@ class Matcher:
     def __init__(self):
         self._counter = 1
         self._names = []
+
+        self.ignored_domains = self.load_ignored_domains()
+
+    def load_ignored_domains(self, path=os.path.join(filedir, 'domains_ignored.txt')):
+        with open(path, 'r') as f:
+            result = f.read().splitlines()
+        return result
 
     def set_df(
         self,
@@ -109,7 +120,7 @@ class Matcher:
             matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
             matches = matches[~matches[self.frame__2.index].isnull()]
 
-            matches = matches[[self.frame__1.index, self.frame__2.index]]
+            matches = matches[[self.frame__1.index, self.frame__2.index, var]]
             if verbose:
                 print(f'Phone matches: {matches.shape[0]}')
 
@@ -133,13 +144,18 @@ class Matcher:
             df_1[var] = df_1[self.frame__1.domain].apply(extract_domain)
             df_2[var] = df_2[self.frame__2.domain].apply(extract_domain)
 
+            # Skip domains that are part of self.ignored_domains
+            # Evaluate moving this to the url.functions extract_domain
+            df_1 = df_1[~df_1[var].isin(self.ignored_domains)]
+            df_2 = df_2[~df_2[var].isin(self.ignored_domains)]
+
             df_1.dropna(subset=[var], inplace=True)
             df_2.dropna(subset=[var], inplace=True)
 
             matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
             matches = matches[~matches[self.frame__2.index].isnull()]
 
-            matches = matches[[self.frame__1.index, self.frame__2.index]]
+            matches = matches[[self.frame__1.index, self.frame__2.index, var]]
             if verbose:
                 print(f'Domain matches: {matches.shape[0]}')
 
@@ -166,7 +182,7 @@ class Matcher:
             matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
             matches = matches[~matches[self.frame__2.index].isnull()]
 
-            matches = matches[[self.frame__1.index, self.frame__2.index]]
+            matches = matches[[self.frame__1.index, self.frame__2.index, var]]
             if verbose:
                 print(f'Address matches: {matches.shape[0]}')
 
@@ -176,22 +192,22 @@ class Matcher:
 
     def run(self, save=False, verbose=True):
         # Run individual matches according to attribute and concatenate.
-        phone = self.phone(verbose=True)
-        domain = self.domain(verbose=True)
-        address = self.address(verbose=True)
-        all_matches = pd.concat([phone, domain, address])
+        self.phone_matches = self.phone(verbose=True)
+        self.domain_matches = self.domain(verbose=True)
+        self.address_matches = self.address(verbose=True)
+        self.all_matches = pd.concat([self.phone_matches, self.domain_matches, self.address_matches])
 
         # Create dummy column.
         # One important thing here is to group by first by self.frame__2.index since it has the One to Many relationship
-        all_matches = all_matches.groupby([self.frame__1.index, self.frame__2.index]).agg({'match_type': ['count', list]})
+        self.all_matches = self.all_matches.groupby([self.frame__1.index, self.frame__2.index]).agg({'match_type': ['count', list]})
         columns = ['match_count', 'match_type']
-        all_matches.columns = columns
-        all_matches['match_type'] = all_matches['match_type'].apply(json.dumps)
-        all_matches.sort_values(['match_count', 'match_type'], ascending=False, inplace=True)
-        all_matches.reset_index(inplace=True)
+        self.all_matches.columns = columns
+        self.all_matches['match_type'] = self.all_matches['match_type'].apply(json.dumps)
+        self.all_matches.sort_values(['match_count', 'match_type'], ascending=False, inplace=True)
+        self.all_matches.reset_index(inplace=True)
 
-        # Merge the original dataframes with the pivot 'all_matches'.
-        results = pd.merge(self.frame__1.data, all_matches, on=self.frame__1.index)
+        # Merge the original dataframes with the pivot 'self.all_matches'.
+        results = pd.merge(self.frame__1.data, self.all_matches, on=self.frame__1.index)
         results = pd.merge(results, self.frame__2.data, on=self.frame__2.index, suffixes=(self.frame__1.suffix, self.frame__2.suffix))
         results.sort_values(['match_count', 'match_type'], ascending=False, inplace=True)
 
