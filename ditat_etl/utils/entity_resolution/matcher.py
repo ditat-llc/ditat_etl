@@ -31,12 +31,13 @@ class Frame:
         self.data = data.copy()
         self.name = name
         self.index = f"{index}_{name}"
-        self.domain = f"{domain}_{name}"
-        self.address = f"{address}_{name}"
-        self.phone = f"{phone}_{name}"
-        self.country = f"{country}_{name}"
-        self.suffix = f"_{name}"
 
+        self.domain = f"{domain}_{name}" if domain else None
+        self.address = f"{address}_{name}" if address else None
+        self.phone = f"{phone}_{name}" if phone else None
+        self.country = f"{country}_{name}" if country else None
+        
+        self.suffix = f"_{name}"
         self.data = self.data.add_suffix(f'_{name}')
 
 class Matcher:
