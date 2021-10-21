@@ -47,7 +47,8 @@ class Postgres:
         'string': 'varchar',
         'textarea': 'varchar',
         'time': 'time',
-        'url': 'varchar'
+        'url': 'varchar',
+        'address': 'jsonb'
     }
 
     def __init__(self, config, keep_connection_alive=False):
@@ -427,8 +428,7 @@ class Postgres:
         self,
         tablename,
         column_mappings,
-        primary_key=False,
-        primary_key_value='Id',
+        primary_key='id',
         if_not_exists=True,
         commit=True
         ):
@@ -437,8 +437,12 @@ class Postgres:
             Like Salesforce Object.
 
         Args:
-            pending...
-
+            - tablename (str) 
+            - column_mappings (dict): Dictionary of names and postgres datatypes
+            - primary_key (str or False): Create an index on a single column
+                ** Does not support multiple-column index. You need to call self.create_table_index()
+            - if_not_exists(bool, default=True)
+            - commit(bool, default=Truie)
         '''
         query = 'CREATE TABLE '
         if if_not_exists:
@@ -451,7 +455,7 @@ class Postgres:
         for column in column_mappings:
             s = f"{column['name']} {column['type']}"
             
-            if primary_key and column['name'] == primary_key_value:
+            if primary_key and column['name'] == primary_key:
                 s += ' PRIMARY KEY'
             columns.append(s)
 

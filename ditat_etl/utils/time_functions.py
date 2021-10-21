@@ -25,3 +25,15 @@ def time_it(text=None):
             return result
         return wrapper
     return decorator
+
+
+
+####### MOVE TO ANOTHER FILE ###########
+def int_to_chunks(number, n):
+    l = [int(number / n)] * n
+    diff = number % n
+    for i in range(diff):
+        l[i] += 1
+    return l
+
+########################################
