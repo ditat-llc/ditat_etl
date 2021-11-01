@@ -1,13 +1,14 @@
 '''
 Test stuff
 '''
-# import pandas as pd
-from ditat_etl.utils import Matcher
-from ditat_etl.url.functions import extract_domain
-
-print(extract_domain('https://www.samsung.com/us/'))
 
 
+import pandas as pd
 
+codes = pd.read_csv('./ditat_etl/utils/country_codes.csv')
+codes.set_index('country', inplace=True)
 
+df = pd.DataFrame({'new': ['chile', 'australia']})
 
+df['new_column'] = df['new'].map(codes['iso'])
+print(df)

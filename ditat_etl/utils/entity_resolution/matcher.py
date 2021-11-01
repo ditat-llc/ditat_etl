@@ -41,9 +41,10 @@ class Frame:
         self.data = self.data.add_suffix(f'_{name}')
 
 class Matcher:
-    def __init__(self):
+    def __init__(self, exact_domain):
         self._counter = 1
         self._names = []
+        self.exact_domain = exact_domain
 
         self.ignored_domains = self.load_ignored_domains()
 
@@ -60,7 +61,7 @@ class Matcher:
         domain=None,
         address=None,
         phone=None,
-        country=None
+        country=None,
         ):
         '''
         Args:
@@ -142,8 +143,12 @@ class Matcher:
             df_1.dropna(subset=[self.frame__1.domain], inplace=True)
             df_2.dropna(subset=[self.frame__2.domain], inplace=True)
 
-            df_1[var] = df_1[self.frame__1.domain].apply(extract_domain)
-            df_2[var] = df_2[self.frame__2.domain].apply(extract_domain)
+            if self.exact_domain:
+                df_1[var] = df_1[self.frame__1.domain]
+                df_2[var] = df_2[self.frame__2.domain]
+            else:
+                df_1[var] = df_1[self.frame__1.domain].apply(extract_domain)
+                df_2[var] = df_2[self.frame__2.domain].apply(extract_domain)
 
             # Skip domains that are part of self.ignored_domains
             # Evaluate moving this to the url.functions extract_domain
