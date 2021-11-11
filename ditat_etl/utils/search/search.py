@@ -6,7 +6,6 @@ def filter_companies(
         mapping: dict,
         index_column: str='id'
     ):
-
     '''
     Filters dataframe according to different mapping using
     column names(s) as candidates where the label/tags mmight be present.
