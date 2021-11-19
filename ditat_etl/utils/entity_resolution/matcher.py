@@ -41,7 +41,7 @@ class Frame:
         self.data = self.data.add_suffix(f'_{name}')
 
 class Matcher:
-    def __init__(self, exact_domain):
+    def __init__(self, exact_domain=False):
         self._counter = 1
         self._names = []
         self.exact_domain = exact_domain
