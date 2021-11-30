@@ -291,6 +291,8 @@ class Postgres:
         Returns:
             - 'INSERT 0 {N_RECORDS}'
         '''
+        df = df.where(pd.notnull(df), None) 
+
         df_dict = df.to_dict(orient='records')
         keys = ', '.join(df_dict[0].keys())
         values = [tuple(i.values()) for i in df_dict]
@@ -367,6 +369,8 @@ class Postgres:
         updated_columns = [col for col in df.columns if col in table_columns if col not in on_columns]
 
         df = df[on_columns + updated_columns]
+
+        df = df.where(pd.notnull(df), None) 
         
         records = df.to_dict(orient='records')
         records = [tuple(value.values()) for value in records]
