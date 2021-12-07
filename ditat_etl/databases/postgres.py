@@ -3,6 +3,7 @@ from functools import wraps
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
+import numpy as np
 
 
 class Postgres:
@@ -335,7 +336,8 @@ class Postgres:
         on_columns: str or list,
         insert_new=True,
         commit=True,
-        verbose=False
+        verbose=False,
+        overwrite=False
         ):
         '''
         This implementation is slightly different from
@@ -355,11 +357,14 @@ class Postgres:
                 present in the table according to "on_columns".
             - commit (bool, default=True): Commit changes.
             - verbose (bool, default=False): Print query.
+            - overwrite (bool, default=False): If False, values will only be updated if
+                existing evaluate to NULL.
 
         Returns:
             - {'update': 'UPDATE {N_RECORDS}'} or {'update': 'UPDATE {N_RECORDS}', 'INSERT 0 {N_RECORDS}'}
         '''
-        table_columns = self.get_table_cols(tablename)
+        table_data_types = self.get_table_data_types(tablename)
+        table_columns = list(table_data_types.keys())
 
         for col in df.columns:
             if col not in table_columns:
@@ -370,14 +375,26 @@ class Postgres:
 
         df = df[on_columns + updated_columns]
 
+        filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
+        df = df.astype(filtered_data_types)
+        
         df = df.where(pd.notnull(df), None) 
+        df = df.replace({'nan': None})
         
         records = df.to_dict(orient='records')
         records = [tuple(value.values()) for value in records]
 
+        if overwrite:
+            initial_source = 'df'
+            secondary_source = 'target'
+        else:
+            initial_source = 'target'
+            secondary_source = 'df'
+
         query = '''UPDATE {} as target SET {} FROM (VALUES {}) AS df({}) WHERE {};'''.format(
             tablename,
-            ', '.join([f"{col} = df.{col}" for col in updated_columns]),
+            # ', '.join([f"{col} = df.{col}" for col in updated_columns]),
+            ', '.join([f"{col} = COALESCE({initial_source}.{col}, {secondary_source}.{col})" for col in updated_columns]),
             ', '.join(["%s"] * len(records)),
             ', '.join(df.columns.tolist()),
             'AND '.join([f"df.{col} = target.{col}" for col in on_columns])
