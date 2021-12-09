@@ -27,6 +27,7 @@ class Frame:
         address=None,
         phone=None,
         country=None,
+        entity_name=None,
         ):
         self.data = data.copy()
         self.name = name
@@ -36,6 +37,7 @@ class Frame:
         self.address = f"{address}_{name}" if address else None
         self.phone = f"{phone}_{name}" if phone else None
         self.country = f"{country}_{name}" if country else None
+        self.entity_name = f"{entity_name}_{name}" if entity_name else None
         
         self.suffix = f"_{name}"
         self.data = self.data.add_suffix(f'_{name}')
@@ -44,6 +46,7 @@ class Matcher:
     def __init__(self, exact_domain=False):
         self._counter = 1
         self._names = []
+
         self.exact_domain = exact_domain
 
         self.ignored_domains = self.load_ignored_domains()
@@ -62,16 +65,20 @@ class Matcher:
         address=None,
         phone=None,
         country=None,
+        entity_name: str=None
         ):
         '''
         Args:
             - data (pd.Dataframe)
-            - name (str)
+            - name (str): Name of dataframe used for suffixes 
             - index (str, default='id')
             - domain (str, default=None)
             - address (str, default=None)
             - phone (str, default=None)
             - country (str, default=None)
+            - entity_name (str, default=None): Company/Person Name,
+                do not confuse with name
+                
 
         Note:
             - Since the matching might either have One to One relationship
@@ -90,13 +97,24 @@ class Matcher:
             domain=domain,
             address=address,
             phone=phone,
-            country=country
+            country=country,
+            entity_name=entity_name
         )
 
         setattr(self, f"frame__{self._counter}", frame)
         
         self._counter += 1
         self._names.append(name)
+    
+    @staticmethod
+    def clean_field(x):
+        x = x.lower()
+        replacements = [",", ".", '"', "'", "!", "?", "/"]
+        for r in replacements:
+            x = x.replace(r, "")
+        x = x.split()
+        x = sorted(x)
+        return str(x)
 
     def phone(self, verbose=False):
         if all([
@@ -185,6 +203,11 @@ class Matcher:
             df_1[var] = df_1[self.frame__1.address]
             df_2[var] = df_2[self.frame__2.address]
 
+            # Custom
+            df_1[var] = df_1[var].apply(type(self).clean_field)
+            df_2[var] = df_2[var].apply(type(self).clean_field)
+            ####
+
             matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
             matches = matches[~matches[self.frame__2.index].isnull()]
 
@@ -196,12 +219,51 @@ class Matcher:
 
             return matches
 
+    def entity_name(self, verbose=False):
+        if all([
+            self.frame__1.entity_name, 
+            self.frame__2.entity_name
+        ]):
+            var = 'entity_name_fmt'
+
+            df_1 = self.frame__1.data.copy()
+            df_2 = self.frame__2.data.copy()
+
+            df_1.dropna(subset=[self.frame__1.entity_name], inplace=True)
+            df_2.dropna(subset=[self.frame__2.entity_name], inplace=True)
+
+            df_1[var] = df_1[self.frame__1.entity_name]
+            df_2[var] = df_2[self.frame__2.entity_name]
+
+            # Custom
+            df_1[var] = df_1[var].apply(type(self).clean_field)
+            df_2[var] = df_2[var].apply(type(self).clean_field)
+            ####
+
+            matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
+            matches = matches[~matches[self.frame__2.index].isnull()]
+
+            matches = matches[[self.frame__1.index, self.frame__2.index, var]]
+            if verbose:
+                print(f'Entity name matches: {matches.shape[0]}')
+
+            matches['match_type'] = 'entity_name'
+
+            return matches
+
     def run(self, save=False, verbose=True):
         # Run individual matches according to attribute and concatenate.
-        self.phone_matches = self.phone(verbose=True)
-        self.domain_matches = self.domain(verbose=True)
-        self.address_matches = self.address(verbose=True)
-        self.all_matches = pd.concat([self.phone_matches, self.domain_matches, self.address_matches])
+        self.phone_matches = self.phone(verbose=verbose)
+        self.domain_matches = self.domain(verbose=verbose)
+        self.address_matches = self.address(verbose=verbose)
+        self.entity_name_matches = self.entity_name(verbose=verbose)
+
+        self.all_matches = pd.concat([
+            self.phone_matches,
+            self.domain_matches,
+            self.address_matches,
+            self.entity_name_matches,
+        ])
 
         # Create dummy column.
         # One important thing here is to group by first by self.frame__2.index since it has the One to Many relationship
