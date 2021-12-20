@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from ditat_etl import __version__
 
 with open('README.md', 'r') as f:
 	long_description = f.read()
@@ -11,7 +12,7 @@ setup(
 	long_description=long_description,
 	long_description_content_type='text/markdown',
 	name='ditat_etl',
-	version='0.0.25',
+	version=__version__,
 	packages=find_packages(include=['ditat_etl', 'ditat_etl.*']),
 	include_package_data=True,
 	package_data={
