@@ -10,7 +10,7 @@ import pandas as pd
 # Avoid going to database if files already exists locally.
 def load_table(
         tablename: str,
-        db_instance, 
+        db_instance=None, 
         force=False,
         query=None,
     ):

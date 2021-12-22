@@ -376,11 +376,11 @@ class Postgres:
         df = df[on_columns + updated_columns]
 
         filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
-        df = df.astype(filtered_data_types)
+        df = df.astype(filtered_data_types, errors='ignore')
         
         df = df.where(pd.notnull(df), None) 
         df = df.replace({'nan': None})
-        
+
         records = df.to_dict(orient='records')
         records = [tuple(value.values()) for value in records]
 
