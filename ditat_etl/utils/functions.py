@@ -2,11 +2,6 @@ import os
 
 import pandas as pd 
 
-
-
-
-
-
 # Avoid going to database if files already exists locally.
 def load_table(
         tablename: str,

@@ -4,7 +4,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 import requests
 
-from ..utils import time_it
+from ..utils.time_functions import time_it
 
 
 def extract_domain(url_or_email):
@@ -25,19 +25,22 @@ def eval_url(
     max_workers: int=10000,
     timeout=60,
 ):
+    '''
+        This function can later be moved to class Url()
+    '''
     url  = [url] if isinstance(url, str) else url
 
     @time_it()
     def f(url):
         if not url.startswith('http'):
-            clean_url_1 = 'http://' + url
-            clean_url_2 = 'https://' + url
+            url2 = 'https://' + url
+            url = 'http://' + url
         try:
-            r = requests.get(clean_url_1, timeout=timeout)
+            r = requests.get(url, timeout=timeout)
             return r.status_code
         except:
             try:
-                r = requests.get(clean_url_2, timeout=timeout)
+                r = requests.get(url2, timeout=timeout)
                 return r.status_code
             except:
                 return None

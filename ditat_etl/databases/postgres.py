@@ -1,3 +1,4 @@
+import json
 from functools import wraps
 
 import psycopg2
@@ -9,7 +10,6 @@ import numpy as np
 class Postgres:
     TYPES_MAPPING = {
         'text': str,
-        'get_table_data_types': str,
         'bigint': int,
         'double precision': float, #float,
         'timestamp without time zone': 'datetime64', #check
@@ -22,6 +22,7 @@ class Postgres:
         'numeric': float,
         'date': 'datetime64',
         'jsonb': dict,
+        'ARRAY': list
     }
     SF_TO_POSTGRES_TYPES = {
         # 'anytype': 'text',
@@ -270,7 +271,7 @@ class Postgres:
         df: pd.DataFrame,
         tablename: str,
         commit=True,
-        conflict_on: list=None,
+        conflict_on: str or list=None,
         do_update_columns: bool or list=False,
         verbose=False
     ):
@@ -294,12 +295,22 @@ class Postgres:
         '''
         df = df.where(pd.notnull(df), None) 
 
+        table_data_types = self.get_table_data_types(tablename)
+        filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
+        
+        # for col in df.columns:
+        #     if filtered_data_types[col] in [list]:
+        #         # df[col] = df[col].apply(json.dumps)
+        #         print(df[col])
+
         df_dict = df.to_dict(orient='records')
         keys = ', '.join(df_dict[0].keys())
         values = [tuple(i.values()) for i in df_dict]
 
         query = '''INSERT INTO {} ({}) VALUES '''.format(tablename, keys)
         query += ', '.join(["%s"] * len(values))
+
+        conflict_on = conflict_on if isinstance(conflict_on, list) else [conflict_on]
 
         if conflict_on:
             if do_update_columns is False:
