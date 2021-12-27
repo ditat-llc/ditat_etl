@@ -1,5 +1,6 @@
 import json
 from functools import wraps
+from ast import literal_eval
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -282,6 +283,7 @@ class Postgres:
             - df (pd.DataFrame): Values to be updated.
             - tablename (str): Table name to in the db.
             - commit (bool, default=True): Commit changes.
+            - conflict_on (str or list, defualt=None): Primary key(s)
             - on_columns (list, default=None): Index column(s) for conflict
                 evaluation.
             - do_update_columns(bool or list, default=False):
@@ -293,15 +295,35 @@ class Postgres:
         Returns:
             - 'INSERT 0 {N_RECORDS}'
         '''
-        df = df.where(pd.notnull(df), None) 
-
+        # Casting correct data types
         table_data_types = self.get_table_data_types(tablename)
         filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
-        
-        # for col in df.columns:
-        #     if filtered_data_types[col] in [list]:
-        #         # df[col] = df[col].apply(json.dumps)
-        #         print(df[col])
+
+        for col in df.columns:
+            data_type = filtered_data_types[col]
+
+            if data_type == list:
+                df[col] = df[col].apply(literal_eval)
+
+            elif data_type == dict:
+                df[col] = df[col].apply(literal_eval).apply(json.dumps)
+
+            elif data_type in [int, float]:
+                # Workaround
+                df[col] = df[col].fillna(-99_999)
+
+            # else:
+            #     df[col] = df[col].astype(data_type, errors='ignore')
+
+        df = df.where(pd.notnull(df), None)
+        df = df.replace({pd.NaT: 'nan'})
+        df = df.replace({'nan': None})
+
+        '''
+            We still need to replace NaN with None for numerical columns.
+            For now we use a negative -99_999
+        '''
+        ######
 
         df_dict = df.to_dict(orient='records')
         keys = ', '.join(df_dict[0].keys())
@@ -310,9 +332,8 @@ class Postgres:
         query = '''INSERT INTO {} ({}) VALUES '''.format(tablename, keys)
         query += ', '.join(["%s"] * len(values))
 
-        conflict_on = conflict_on if isinstance(conflict_on, list) else [conflict_on]
-
         if conflict_on:
+            conflict_on = conflict_on if isinstance(conflict_on, list) else [conflict_on]
             if do_update_columns is False:
                 query += f" ON CONFLICT ({', '.join(conflict_on)}) DO NOTHING"
 
