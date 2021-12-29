@@ -324,11 +324,7 @@ class Postgres:
                 if data_type == int:
                     df[col] = df[col].apply(lambda x: x.split('.')[0] if x is not None else x)
 
-            elif data_type == str:
-                if df[col].dtype != 'object':
-                    df[col] = df[col].astype(str)
-                    df = df.replace({'nan': None})
-
+        # df = df.replace({pd.NaT: np.nan}) # This line breaks the process
         df = df.where(pd.notnull(df), None)
         ######
 
@@ -441,11 +437,10 @@ class Postgres:
                 if data_type == int:
                     df[col] = df[col].apply(lambda x: x.split('.')[0] if x is not None else x)
 
-            elif data_type == str:
-                if df[col].dtype != 'object':
-                    df[col] = df[col].astype(str)
-                    df = df.replace({'nan': None})
+            else:
+                df[col] = df[col].astype(data_type)
 
+        # df = df.replace({pd.NaT: np.nan})
         df = df.where(pd.notnull(df), None)
         ###
 
@@ -502,15 +497,11 @@ class Postgres:
             )
             new_df = new_df[new_df['_merge'] == 'left_only']
             new_df = new_df[on_columns + updated_columns]
-
             if new_df.shape[0] > 0:
                 result = self.insert_df_to_sql(
                     df=new_df,
                     tablename=tablename,
-                    commit=commit,
-                    conflict_on=None,
-                    do_update_columns=False,
-                    verbose=verbose
+                    commit=commit
                 )
                 results['insert'] = result
             else:
