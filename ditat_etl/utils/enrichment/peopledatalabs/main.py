@@ -1,8 +1,12 @@
 import os
 import json
+from io import StringIO
 
 import requests
 import pandas as pd
+import boto3
+
+from ... import time_it
 
 
 class PeopleDataLabs:
@@ -17,14 +21,73 @@ class PeopleDataLabs:
         'person_search',
     ]
 
-    def __init__( self, api_key: str,) -> None:
-        self.api_key = api_key
-        self.create_dir()
+    def __init__(
+        self,
+        api_key: str,
+        check_existing_method: str='local',
+        **kwargs
 
-    def create_dir(self):
-        for dir in type(self).SAVE_DIRS:
-            if not os.path.exists(dir):
-                os.makedirs(dir)
+    ) -> None:
+        '''
+        Args:
+            - api_key (str): People Data Labs api_key
+            - check_existing_method (str): {local, s3, (others coming soon)}
+        '''
+        self.api_key = api_key
+        self.check_existing_method = check_existing_method
+        self.init(**kwargs)
+
+    def init(
+        self,
+        s3_config: dict=None,
+        **kwargs
+    ):
+        # Check existing files locally
+        if self.check_existing_method == 'local': 
+            for dir in type(self).SAVE_DIRS:
+                if not os.path.exists(dir):
+                    os.makedirs(dir)
+
+        elif self.check_existing_method == 's3':
+            self.s3_setup(**s3_config)
+
+    @time_it()
+    def s3_setup(
+        self,
+        bucket_name,
+        account_enrichment_key: str=None,
+        account_search_key: str=None,
+        person_enrichment_key: str=None,
+        person_search_key: str=None,
+    ):
+        self.s3 = boto3.resource('s3')
+        self.bucket = self.s3.Bucket(bucket_name)
+
+        files = self.bucket.objects.all()
+
+        mapping = {
+            's3_ae': account_enrichment_key,
+            's3_as': account_search_key,
+            's3_pe': person_enrichment_key,
+            's3_ps': person_search_key,
+        }
+        mapping = {i: j for i, j in mapping.items() if j}
+
+        for key, value in mapping.items():
+            filtered_files = [f for f in files if f.key.startswith(value)] 
+
+            dfs = []
+            for f in filtered_files:
+                print(f'Processing: {f.key}')
+                try:
+                    df = pd.read_csv(StringIO(f.get()['Body'].read().decode('UTF-8')))
+                    dfs.append(df)
+
+                except:
+                    print(f"Error: {f.key}")
+
+            if dfs:
+                setattr(self, key, pd.concat(dfs, axis=0, ignore_index=True))
 
     def aggregate(self, dir_type: str):
         if dir_type not in type(self).SAVE_DIRS:
@@ -56,13 +119,18 @@ class PeopleDataLabs:
         **kwargs
     ):
         # Checking minimum fields.
-        required_fields = ['name', 'profile', 'ticker', 'website']
+        required_fields = {
+            'name': ['name'],
+            'profile': ['linkedin_url', 'facebook_url', 'twitter_url'],
+            'ticker': ['ticker'],
+            'website': ['website']
+        }
 
         if not any(i in required_fields for i in kwargs):
             raise ValueError(f'You need to specify at least one of {required_fields}')
 
         # Process to check if file company has already been enriched.
-        if check_existing:
+        if check_existing and self.check_existing_method == 'local':
             existing_files = []
             existing_filenames =[f"company_enrichment/{i}" for i in os.listdir('company_enrichment')] 
             for file in existing_filenames:
@@ -75,8 +143,18 @@ class PeopleDataLabs:
                     if required_field in kwargs:
                         if kwargs[required_field] in existing_file[required_field] or \
                         existing_file[required_field] in kwargs[required_field]:
-                            print(f"{kwargs[required_field]} already exists.")
+                            print(f"{required_field}: {kwargs[required_field]} already exists in local.")
                             return None
+        
+        # Using self.s3_ae to check existing
+        elif check_existing and self.check_existing_method == 's3':
+            if hasattr(self, 's3_ae'):
+                for key, value in required_fields.items():
+                    if key in kwargs:
+                        for v in value:
+                            if kwargs[key] in self.s3_ae[v].values:
+                                print(f"{key}: {kwargs[key]} already exists in s3.")
+                                return None
         #####
         url = f"{type(self).BASE_URL}/company/enrich"
 
@@ -125,10 +203,16 @@ class PeopleDataLabs:
                 sql += ' AND'
             sql += f' {required} IS NOT NULL'
 
-        if check_existing:
+        if check_existing and self.check_existing_method == 'local':
             existing = self.aggregate(dir_type='company_search')
             if existing is not None:
                 existing = existing.website.tolist()
+                existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
+                sql += existing_str
+
+        elif check_existing and self.check_existing_method == 's3':
+            if hasattr(self, 's3_as'):
+                existing = self.s3_as.website.tolist()
                 existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
                 sql += existing_str
 

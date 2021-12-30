@@ -3,6 +3,7 @@ chromedriver
 __pycache__/
 *.py[cod]
 *$py.class
+playground.py
 
 # C extensions
 *.so

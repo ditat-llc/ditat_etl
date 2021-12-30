@@ -237,7 +237,7 @@ class Matcher:
             f_col = results.pop(col)
             results.insert(0, col, f_col)
 
-        # Filtering according to match_type and match_counto
+        # Filtering according to match_type and match_count
         results = results.loc[ 
             (results.match_count >= 2)
             | (results.match_type == '["domain"]'),
