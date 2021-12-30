@@ -19,6 +19,7 @@ def extract_domain(url_or_email):
 		domain = urlparse(url_or_email.replace('www.', '')).netloc
 		return domain
 
+
 @time_it()
 def eval_url(
     url: str or list,
