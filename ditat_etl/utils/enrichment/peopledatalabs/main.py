@@ -1,6 +1,8 @@
 import os
 import json
-from io import StringIO
+from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 import requests
 import pandas as pd
@@ -15,8 +17,8 @@ class PeopleDataLabs:
     BASE_URL = f'https://api.peopledatalabs.com/{VERSION}'
 
     SAVE_DIRS = [  
-        'company_enrichment',
-        'company_search',
+        'account_enrichment',
+        'account_search',
         'person_enrichment',
         'person_search',
     ]
@@ -24,7 +26,7 @@ class PeopleDataLabs:
     def __init__(
         self,
         api_key: str,
-        check_existing_method: str='local',
+        check_existing_method: str='s3',
         **kwargs
 
     ) -> None:
@@ -37,11 +39,7 @@ class PeopleDataLabs:
         self.check_existing_method = check_existing_method
         self.init(**kwargs)
 
-    def init(
-        self,
-        s3_config: dict=None,
-        **kwargs
-    ):
+    def init(self, **kwargs):
         # Check existing files locally
         if self.check_existing_method == 'local': 
             for dir in type(self).SAVE_DIRS:
@@ -49,7 +47,7 @@ class PeopleDataLabs:
                     os.makedirs(dir)
 
         elif self.check_existing_method == 's3':
-            self.s3_setup(**s3_config)
+            self.s3_setup(**kwargs)
 
     @time_it()
     def s3_setup(
@@ -59,32 +57,41 @@ class PeopleDataLabs:
         account_search_key: str=None,
         person_enrichment_key: str=None,
         person_search_key: str=None,
+        **kwargs
     ):
-        self.s3 = boto3.resource('s3')
-        self.bucket = self.s3.Bucket(bucket_name)
+        self.s3_resource = boto3.resource('s3')
+        self.s3_client = boto3.client('s3')
 
-        files = self.bucket.objects.all()
+        self.bucket_name = bucket_name
+        self.bucket = self.s3_resource.Bucket(self.bucket_name)
 
-        mapping = {
-            's3_ae': account_enrichment_key,
-            's3_as': account_search_key,
-            's3_pe': person_enrichment_key,
-            's3_ps': person_search_key,
+        self.s3_folders = {
+            's3_ae': account_enrichment_key or 'account_enrichment',
+            's3_as': account_search_key or 'account_search',
+            's3_pe': person_enrichment_key or 'person_enrichment',
+            's3_ps': person_search_key or 'person_search',
         }
-        mapping = {i: j for i, j in mapping.items() if j}
+        self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 
-        for key, value in mapping.items():
-            filtered_files = [f for f in files if f.key.startswith(value)] 
+        @time_it()
+        def _read_file_from_s3(file):
+            print(f'Processing: {file.key}')
+            try:
+                fmt_file = file.get()['Body'].read().decode('UTF-8')
+                df = pd.json_normalize(json.loads(fmt_file))
+                return df
+            except Exception:
+                print(f"Error: {file.key}")
+        
+        for key, value in self.s3_folders.items():
+            print(f"Starting {value} setup")
 
-            dfs = []
-            for f in filtered_files:
-                print(f'Processing: {f.key}')
-                try:
-                    df = pd.read_csv(StringIO(f.get()['Body'].read().decode('UTF-8')))
-                    dfs.append(df)
+            filtered_files = self.bucket.objects.filter(Prefix=f"{value}/").all()
+            filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
 
-                except:
-                    print(f"Error: {f.key}")
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                results = ex.map(_read_file_from_s3, filtered_files)
+            dfs = [df for df in results if df is not None]
 
             if dfs:
                 setattr(self, key, pd.concat(dfs, axis=0, ignore_index=True))
@@ -132,7 +139,7 @@ class PeopleDataLabs:
         # Process to check if file company has already been enriched.
         if check_existing and self.check_existing_method == 'local':
             existing_files = []
-            existing_filenames =[f"company_enrichment/{i}" for i in os.listdir('company_enrichment')] 
+            existing_filenames =[f"account_enrichment/{i}" for i in os.listdir('account_enrichment')] 
             for file in existing_filenames:
                 with open(file, 'r') as f:
                     file_data = json.loads(f.read())
@@ -168,9 +175,16 @@ class PeopleDataLabs:
         json_response = requests.get(url, params=params).json()
 
         if json_response["status"] == 200:
-            if save:
-                with open(os.path.join('company_enrichment', f"{json_response['id']}.json"), 'w') as out:
+            if save and self.check_existing_method == 'local':
+                with open(os.path.join('account_enrichment', f"{json_response['id']}.json"), 'w') as out:
                     out.write(json.dumps(json_response))
+
+            elif save and self.check_existing_method == 's3':
+                fmt_filename = f"{self.s3_folders['s3_ae']}/{json_response['id']}.json"
+                fmt_file = BytesIO(json.dumps(json_response).encode('UTF-8'))
+
+                response = self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
+                print(response)
 
         return json_response
 
@@ -180,6 +194,7 @@ class PeopleDataLabs:
         strategy='AND',
         size=1,
         check_existing=True,
+        save=True,
         verbose=True,
         **kwargs,
     ):
@@ -204,7 +219,7 @@ class PeopleDataLabs:
             sql += f' {required} IS NOT NULL'
 
         if check_existing and self.check_existing_method == 'local':
-            existing = self.aggregate(dir_type='company_search')
+            existing = self.aggregate(dir_type='account_search')
             if existing is not None:
                 existing = existing.website.tolist()
                 existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
@@ -231,20 +246,30 @@ class PeopleDataLabs:
           params=P
         ).json()
 
+        print(response)
+
         if response['status'] == 200:
             for company in response['data']:
                 id = company['id']
-                with open(f'company_search/{id}.json', 'w') as out:
-                    out.write(json.dumps(company))
 
-        return response
+                if save and self.check_existing_method == 'local':
+                    with open(f'account_search/{id}.json', 'w') as out:
+                        out.write(json.dumps(company))
+
+                elif save and self.check_existing_method == 's3':
+                    fmt_filename = f"{self.s3_folders['s3_as']}/{company['id']}.json"
+                    fmt_file = BytesIO(json.dumps(company).encode('UTF-8'))
+                    self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
+
+        return response['data']
     
     def search_person(
         self,
-        required: str=None,
+        required: str='work_email',
         strategy="AND",
         size=1,
         check_existing=True,
+        save=True,
         verbose=True,
         **kwargs
     ):
@@ -269,10 +294,16 @@ class PeopleDataLabs:
                 sql += ' AND'
             sql += f' {required} IS NOT NULL'
 
-        if check_existing:
+        if check_existing and self.check_existing_method == 'local':
             existing = self.aggregate(dir_type='person_search')
             if existing is not None:
                 existing = existing['work_email'].tolist()
+                existing_str =  ' AND work_email NOT IN (' + ', '.join([f"'{i}'" for i in existing]) + ')'
+                sql += existing_str
+
+        elif check_existing and self.check_existing_method == 's3':
+            if hasattr(self, 's3_ps'):
+                existing = self.s3_ps['work_email'].tolist()
                 existing_str =  ' AND work_email NOT IN (' + ', '.join([f"'{i}'" for i in existing]) + ')'
                 sql += existing_str
 
@@ -292,10 +323,17 @@ class PeopleDataLabs:
         ).json()
 
         if response['status'] == 200:
-            for company in response['data']:
-                id = company['id']
-                with open(f'person_search/{id}.json', 'w') as out:
-                    out.write(json.dumps(company))
+            for person in response['data']:
+                id = person['id']
+
+                if save and self.check_existing_method == 'local':
+                    with open(f'person_search/{id}.json', 'w') as out:
+                        out.write(json.dumps(person))
+
+                elif save and self.check_existing_method == 's3':
+                    fmt_filename = f"{self.s3_folders['s3_ps']}/{id}.json"
+                    fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
+                    self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
         return response
 
@@ -308,13 +346,17 @@ class PeopleDataLabs:
         **kwargs
     ):
         # Checking minimum fields.
-        required_fields = ['profile', 'email', 'phone']
+        required_fields = {
+            'profile': ['linkedin_url', 'facebook_url', 'twitter_url'],
+            'email': ['email', 'personal_emails', 'emails'],
+            'phone': ['phone']
+        }
 
         if not any(i in required_fields for i in kwargs):
             raise ValueError(f'You need to specify at least one of {required_fields}')
 
         # Process to check if file company has already been enriched.
-        if check_existing:
+        if check_existing and self.check_existing_method == 'local':
             existing_files = []
             existing_filenames =[f"person_enrichment/{i}" for i in os.listdir('person_enrichment')] 
             for file in existing_filenames:
@@ -324,7 +366,7 @@ class PeopleDataLabs:
 
             for existing_file in existing_files:
                 if 'email' in kwargs:
-                    if required == existing_file['work_email'] or required in existing_file['personal_emails']:
+                    if required == existing_file['work_email'] or required in existing_file['personal_emails']: # Add emails
                         print(f"Email already exists.")
                         return None
 
@@ -335,7 +377,30 @@ class PeopleDataLabs:
                             return None
 
                 elif 'phone' in kwargs:
-                    if required== existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
+                    if required == existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
+                        print(f"Phone already exists.")
+                        return None
+
+        elif check_existing and self.check_existing_method == 's3':
+            if hasattr(self, 's3_pe'):
+                if 'email' in kwargs:
+                    d = kwargs['email']
+                    if d in self.s3_pe['work_email'].values \
+                    or self.s3_pe['personal_emails'].astype(str).str.contains(d).any() \
+                    or self.s3_pe['emails'].astype(str).str.contains(d).any():
+                        print(f"Email already exists.")
+                        return None
+
+                elif 'profile' in kwargs:
+                    d = kwargs['profile']
+                    for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
+                        if d in self.s3_pe[profile].values:
+                            print(f"Profile already exists.")
+                            return None
+
+                elif 'phone' in kwargs:
+                    d = kwargs['phone']
+                    if d in self.s3_pe['mobile_phone'].values or self.s3_pe['phone_numbers'].astype(str).str.contains(d).any():
                         print(f"Phone already exists.")
                         return None
 
@@ -350,11 +415,18 @@ class PeopleDataLabs:
 
         json_response = requests.get(url, params=params).json()
 
-        print(json_response)
-
         if json_response["status"] == 200:
-            if save:
-                with open(os.path.join('person_enrichment', f"{json_response['data']['id']}.json"), 'w') as out:
-                    out.write(json.dumps(json_response['data']))
+            data = json_response['data']
+            filename = f"{json_response['data']['id']}.json"
 
-        return json_response
+            if save and self.check_existing_method == 'local':
+                with open(os.path.join('person_enrichment', f"{filename}"), 'w') as out:
+                    out.write(json.dumps(data))
+
+            elif save and self.check_existing_method == 's3':
+                fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
+                fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
+
+                self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
+
+            return data
