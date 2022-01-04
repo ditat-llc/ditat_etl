@@ -2,7 +2,6 @@ import os
 import json
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 import requests
 import pandas as pd
