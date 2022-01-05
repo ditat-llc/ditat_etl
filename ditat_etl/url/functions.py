@@ -13,7 +13,6 @@ def extract_domain(url_or_email):
         regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         if re.fullmatch(regex, url_or_email):
             domain = url_or_email.split('@')[1]
-            print(domain)
             if domain:
                 return domain
     else:

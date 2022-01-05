@@ -8,6 +8,7 @@ import pandas as pd
 import boto3
 
 from ... import time_it
+from ....url.functions import extract_domain
 
 
 class PeopleDataLabs:
@@ -88,7 +89,7 @@ class PeopleDataLabs:
             filtered_files = self.bucket.objects.filter(Prefix=f"{value}/").all()
             filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
 
-            with ThreadPoolExecutor(max_workers=8) as ex:
+            with ThreadPoolExecutor(max_workers=min(1000, len(filtered_files))) as ex:
                 results = ex.map(_read_file_from_s3, filtered_files)
             dfs = [df for df in results if df is not None]
 
@@ -135,6 +136,12 @@ class PeopleDataLabs:
         if not any(i in required_fields for i in kwargs):
             raise ValueError(f'You need to specify at least one of {required_fields}')
 
+        if 'website' in kwargs:
+            kwargs['website'] = extract_domain(kwargs['website'])
+            if kwargs['website'] is None:
+                print('Not a valid domain.')
+                return None
+
         # Process to check if file company has already been enriched.
         if check_existing and self.check_existing_method == 'local':
             existing_files = []
@@ -147,6 +154,7 @@ class PeopleDataLabs:
             for existing_file in existing_files:
                 for required_field in required_fields:
                     if required_field in kwargs:
+
                         if kwargs[required_field] in existing_file[required_field] or \
                         existing_file[required_field] in kwargs[required_field]:
                             print(f"{required_field}: {kwargs[required_field]} already exists in local.")
@@ -182,8 +190,7 @@ class PeopleDataLabs:
                 fmt_filename = f"{self.s3_folders['s3_ae']}/{json_response['id']}.json"
                 fmt_file = BytesIO(json.dumps(json_response).encode('UTF-8'))
 
-                response = self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
-                print(response)
+                self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
         return json_response
 

@@ -29,7 +29,8 @@ setup(
 		'requests',
 		'pysocks',
 		'selenium',
-		'phonenumbers'
+		'phonenumbers',
+        'boto3',
 	]
 
 )
