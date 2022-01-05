@@ -47,6 +47,7 @@ class PeopleDataLabs:
                     os.makedirs(dir)
 
         elif self.check_existing_method == 's3':
+            self.s3_params = kwargs
             self.s3_setup(**kwargs)
 
     @time_it()
@@ -79,18 +80,19 @@ class PeopleDataLabs:
         }
         self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 
-        @time_it()
+        # @time_it()
         def _read_file_from_s3(file):
-            print(f'Processing: {file.key}')
+            # print(f'Processing: {file.key}')
             try:
                 fmt_file = file.get()['Body'].read().decode('UTF-8')
                 df = pd.json_normalize(json.loads(fmt_file))
                 return df
             except Exception:
-                print(f"Error: {file.key}")
+                pass
+                # print(f"Error: {file.key}")
         
         for key, value in self.s3_folders.items():
-            print(f"Starting {value} setup")
+            print(f"Starting: {value} setup")
 
             filtered_files = self.bucket.objects.filter(Prefix=f"{value}/").all()
             filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
@@ -101,6 +103,8 @@ class PeopleDataLabs:
 
             if dfs:
                 setattr(self, key, pd.concat(dfs, axis=0, ignore_index=True))
+
+        print('Finished: s3_setup')
 
     def aggregate(self, dir_type: str):
         if dir_type not in type(self).SAVE_DIRS:
@@ -129,6 +133,7 @@ class PeopleDataLabs:
         required=None,
         save=True,
         check_existing=True,
+        s3_recalculate=True,
         **kwargs
     ):
         # Checking minimum fields.
@@ -197,6 +202,9 @@ class PeopleDataLabs:
                 fmt_file = BytesIO(json.dumps(json_response).encode('UTF-8'))
 
                 self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
+                
+                if s3_recalculate:
+                    self.s3_setup(**self.s3_params)
 
         return json_response
 
@@ -208,6 +216,7 @@ class PeopleDataLabs:
         check_existing=True,
         save=True,
         verbose=True,
+        s3_recalculate=True,
         **kwargs,
     ):
         url = f"{type(self).BASE_URL}/company/search"
@@ -258,8 +267,6 @@ class PeopleDataLabs:
           params=P
         ).json()
 
-        print(response)
-
         if response['status'] == 200:
             for company in response['data']:
                 id = company['id']
@@ -273,6 +280,9 @@ class PeopleDataLabs:
                     fmt_file = BytesIO(json.dumps(company).encode('UTF-8'))
                     self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
+                    if s3_recalculate:
+                        self.s3_setup(**self.s3_params)
+
         return response['data']
     
     def search_person(
@@ -283,6 +293,7 @@ class PeopleDataLabs:
         check_existing=True,
         save=True,
         verbose=True,
+        s3_recalculate=True,
         **kwargs
     ):
 
@@ -347,6 +358,9 @@ class PeopleDataLabs:
                     fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
                     self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
+                    if s3_recalculate:
+                        self.s3_setup(**self.s3_params)
+
         return response
 
     def enrich_person(
@@ -355,6 +369,7 @@ class PeopleDataLabs:
         required=None,
         save=True,
         check_existing=True,
+        s3_recalculate=True,
         **kwargs
     ):
         # Checking minimum fields.
@@ -440,5 +455,8 @@ class PeopleDataLabs:
                 fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
 
                 self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
+
+                if s3_recalculate:
+                    self.s3_setup(**self.s3_params)
 
             return data
