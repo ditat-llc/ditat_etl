@@ -59,8 +59,14 @@ class PeopleDataLabs:
         person_search_key: str=None,
         **kwargs
     ):
-        self.s3_resource = boto3.resource('s3')
-        self.s3_client = boto3.client('s3')
+        s3_payload = {'service_name': 's3'}
+
+        if 'aws_access_key_id' in kwargs and 'aws_secret_access_key' in kwargs:
+            s3_payload['aws_access_key_id'] = kwargs['aws_access_key_id'] 
+            s3_payload['aws_secret_access_key'] = kwargs['aws_secret_access_key'] 
+
+        self.s3_resource = boto3.resource(**s3_payload)
+        self.s3_client = boto3.client(**s3_payload)
 
         self.bucket_name = bucket_name
         self.bucket = self.s3_resource.Bucket(self.bucket_name)
