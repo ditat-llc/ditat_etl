@@ -31,6 +31,7 @@ setup(
 		'selenium',
 		'phonenumbers',
         'boto3',
+        'simple-salesforce'
 	]
 
 )
