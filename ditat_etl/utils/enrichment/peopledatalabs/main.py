@@ -9,6 +9,7 @@ import boto3
 
 from ... import time_it
 from ....url.functions import extract_domain
+from ....databases import Postgres
 
 
 class PeopleDataLabs:
@@ -27,6 +28,7 @@ class PeopleDataLabs:
         self,
         api_key: str,
         check_existing_method: str='s3',
+        db_config=None,
         **kwargs
 
     ) -> None:
@@ -37,6 +39,7 @@ class PeopleDataLabs:
         '''
         self.api_key = api_key
         self.check_existing_method = check_existing_method
+        self.db_config = db_config
         self.init(**kwargs)
 
     def init(self, **kwargs):
@@ -73,10 +76,10 @@ class PeopleDataLabs:
         self.bucket = self.s3_resource.Bucket(self.bucket_name)
 
         self.s3_folders = {
-            's3_ae': account_enrichment_key or 'account_enrichment',
+            # 's3_ae': account_enrichment_key or 'account_enrichment',
             's3_as': account_search_key or 'account_search',
-            's3_pe': person_enrichment_key or 'person_enrichment',
-            's3_ps': person_search_key or 'person_search',
+            # 's3_pe': person_enrichment_key or 'person_enrichment',
+            # 's3_ps': person_search_key or 'person_search',
         }
         self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 
@@ -86,6 +89,7 @@ class PeopleDataLabs:
             try:
                 fmt_file = file.get()['Body'].read().decode('UTF-8')
                 df = pd.json_normalize(json.loads(fmt_file))
+                # print(f'Finishing: {file.key}')
                 return df
             except Exception:
                 pass
@@ -102,9 +106,78 @@ class PeopleDataLabs:
             dfs = [df for df in results if df is not None]
 
             if dfs:
-                setattr(self, key, pd.concat(dfs, axis=0, ignore_index=True))
+                joined_df = pd.concat(dfs, axis=0, ignore_index=True)
+                setattr(self, key, joined_df)
 
         print('Finished: s3_setup')
+
+    def to_db(self, tablename:str, db_config: dict=None, conflict_on: str='domain'):
+        '''
+        For now the 2 dataframes that are pushed to the DB are:
+            i. self.s3_ae
+            ii. self.s3_as 
+        '''
+        column_mapping = {
+            'name': 'name',
+            'employee_count': 'employee_count',
+            'founded': 'founded',
+            'industry': 'industry',
+            'linkedin_url': 'linkedin_url',
+            'facebook_url': 'facebook_url',
+            'twitter_url': 'twitter_url',
+            'website': 'website',
+            'ticker': 'ticker',
+            'type': 'type',
+            'tags': 'tags',
+            'alternative_names': 'alternative_names',
+            'location.locality': 'city',
+            'location.region': 'state',
+            'location.country': 'country',
+            'location.street_address': 'street',
+            'location.postal_code': 'zip',
+        }
+        self.db = Postgres(db_config)
+        
+        # Account Enrichment Processing 
+        if hasattr(self, 's3_ae'):
+            print(f'Pushing self.s3_ae to table: {tablename}')
+            s3_ae_db = self.s3_ae.copy()
+            s3_ae_db.rename(columns=column_mapping, inplace=True)
+            s3_ae_db = s3_ae_db[column_mapping.values()]
+
+            s3_ae_db['domain'] = s3_ae_db['website'].apply(extract_domain)
+            s3_ae_db = s3_ae_db.loc[(s3_ae_db['domain'] != 'nan') | (~s3_ae_db['domain'].isnull()), :]
+
+            s3_ae_db['data_source'] = 'people_data_labs'
+
+            self.db.insert_df_to_sql(
+                df=s3_ae_db,
+                tablename=tablename,
+                commit=True,
+                conflict_on=conflict_on,
+                do_update_columns=False,
+                verbose=False
+            )
+        # Account Search Processing
+        if hasattr(self, 's3_as'):
+            print(f'Pushing self.s3_as to table: {tablename}')
+            s3_as_db = self.s3_as.copy()
+            s3_as_db.rename(columns=column_mapping, inplace=True)
+            s3_as_db = s3_as_db[column_mapping.values()]
+
+            s3_as_db['domain'] = s3_as_db['website'].apply(extract_domain)
+            s3_as_db = s3_as_db.loc[(s3_as_db['domain'] != 'nan') | (~s3_as_db['domain'].isnull()), :]
+
+            s3_as_db['data_source'] = 'people_data_labs'
+
+            self.db.insert_df_to_sql(
+                df=s3_as_db,
+                tablename=tablename,
+                commit=True,
+                conflict_on=conflict_on,
+                do_update_columns=False,
+                verbose=False
+            )
 
     def aggregate(self, dir_type: str):
         if dir_type not in type(self).SAVE_DIRS:

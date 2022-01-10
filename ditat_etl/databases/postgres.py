@@ -321,6 +321,9 @@ class Postgres:
                 df[col] = df[col].astype(str)
                 df[col] = df[col].replace({'nan': None})
 
+                ### under evaluation
+                df[col] = df[col].replace({'None': None})
+
                 if data_type == int:
                     df[col] = df[col].apply(lambda x: x.split('.')[0] if x is not None else x)
 
@@ -368,6 +371,7 @@ class Postgres:
             mogrify_tuple=values,
             verbose=verbose
         )
+        print(result)
         return result
 
     @time_it()
