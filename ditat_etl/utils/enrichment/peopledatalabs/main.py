@@ -76,10 +76,10 @@ class PeopleDataLabs:
         self.bucket = self.s3_resource.Bucket(self.bucket_name)
 
         self.s3_folders = {
-            # 's3_ae': account_enrichment_key or 'account_enrichment',
+            's3_ae': account_enrichment_key or 'account_enrichment',
             's3_as': account_search_key or 'account_search',
-            # 's3_pe': person_enrichment_key or 'person_enrichment',
-            # 's3_ps': person_search_key or 'person_search',
+            's3_pe': person_enrichment_key or 'person_enrichment',
+            's3_ps': person_search_key or 'person_search',
         }
         self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 

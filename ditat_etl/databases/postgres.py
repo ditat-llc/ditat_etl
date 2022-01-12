@@ -520,6 +520,7 @@ class Postgres:
             else:
                 results['insert'] = 'INSERT 0 0'
 
+        print(results)
         return results
 
     def create_table(
