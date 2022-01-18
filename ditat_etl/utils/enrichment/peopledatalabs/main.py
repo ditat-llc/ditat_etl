@@ -443,6 +443,7 @@ class PeopleDataLabs:
         save=True,
         check_existing=True,
         s3_recalculate=True,
+        verbose=True,
         **kwargs
     ):
         # Checking minimum fields.
@@ -453,7 +454,10 @@ class PeopleDataLabs:
         }
 
         if not any(i in required_fields for i in kwargs):
-            raise ValueError(f'You need to specify at least one of {required_fields}')
+            if all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
+                pass
+            else:
+                raise ValueError(f'You need to specify at least one of {required_fields}')
 
         # Process to check if file company has already been enriched.
         if check_existing and self.check_existing_method == 'local':
@@ -480,6 +484,10 @@ class PeopleDataLabs:
                     if required == existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
                         print(f"Phone already exists.")
                         return None
+                else:
+                    pass
+                    # Pending for combo first_name, last_name and company
+
 
         elif check_existing and self.check_existing_method == 's3':
             if hasattr(self, 's3_pe'):
@@ -504,6 +512,16 @@ class PeopleDataLabs:
                         print(f"Phone already exists.")
                         return None
 
+                elif all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
+                    filtered_df = self.s3_pe.loc[ 
+                        (self.s3_pe['first_name'] == kwargs['first_name'].lower())
+                        & (self.s3_pe['last_name'] == kwargs['last_name'].lower())
+                        & (self.s3_pe['job_company_name'] == kwargs['company'].lower())
+                    ]
+                    if filtered_df.shape[0] > 0:
+                        print('first_name, last_name, company already exists.')
+                        return None
+
         url = f"{type(self).BASE_URL}/person/enrich"
 
         params = {
@@ -514,6 +532,9 @@ class PeopleDataLabs:
         params.update(kwargs)
 
         json_response = requests.get(url, params=params).json()
+
+        if verbose:
+            print(json_response['status'])
 
         if json_response["status"] == 200:
             data = json_response['data']

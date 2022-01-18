@@ -18,7 +18,7 @@ def extract_domain(url_or_email):
     else:
         url_or_email = f'http://{url_or_email}' if not url_or_email.startswith('http') else url_or_email
         domain = urlparse(url_or_email.replace('www.', '')).netloc
-        if domain:
+        if domain and '.' in domain:
             return domain
 
 

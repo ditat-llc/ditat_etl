@@ -1,5 +1,6 @@
 from copy import deepcopy
 import os
+from concurrent.futures import ProcessPoolExecutor, as_completed, ThreadPoolExecutor
 
 import spacy
 
@@ -204,6 +205,7 @@ class IndustryStandard:
         ]
     }
 
+    @time_it()
     def __init__( self, english_pipeline: str='en_core_web_lg') -> None:
         self.load_nlp(english_pipeline=english_pipeline)
         self.industry_nlp = [self.nlp(word) for word in self.industry_categories]
@@ -215,20 +217,20 @@ class IndustryStandard:
 
         except Exception:
             os.system(f"python -m spacy download {english_pipeline}")
-            # subprocess.run(f"python -m spacy download {english_pipeline}")
             self.nlp = spacy.load(english_pipeline)
 
     @property
     def industry_categories(self):
         industry_categories = deepcopy(type(self).INDUSTRY_CATEGORIES)
 
+        # Putting back the parent in the options for matching.
         for industry in industry_categories:
             industry_categories[industry].insert(0, industry)
 
         return industry_categories
         
-    @time_it()
-    def classify(self, text, th=0.3, verbose=True):
+    # @time_it()
+    def classify(self, text, th=0.0, verbose=True):
         if verbose:
             print(f'Classifying: {text}')
 
@@ -248,10 +250,90 @@ class IndustryStandard:
                 industry_result = k
                 break
 
+        # in case industry and subindustry are the same, we go for 2nd best for subindustry
+        if subindustry_result == industry_result:
+            filtered_results = {
+                i: j for i, j in results.items() if i != industry_result \
+                and i in self.industry_categories[industry_result]
+            }
+            subindustry_result = max(filtered_results, key=filtered_results.get)
+            score = filtered_results[subindustry_result]
+
         if score < th:
             return (None, None, None)
 
         return (industry_result, subindustry_result, score)
+
+    @time_it()
+    def classify_bulk(self, text: str or list, th=0.0, verbose=True):
+        text = [text] if isinstance(text, str) else text
+
+        unique_text = set(text)
+
+        unique_results = {i: self.classify(i, verbose=verbose, th=th) for i in unique_text}
+
+        results = [unique_results[i] for i in text]
+
+        return results
+
+
+    # @time_it()
+    # def classify_bulk(self, text: str or list):
+    #     text = [text] if isinstance(text, str) else text
+    #
+    #     unique_text = list(set(text))
+    #
+    #     max_workers = min(len(unique_text), os.cpu_count() + 4)
+    #
+    #     unique_results = {}
+    #
+    #     with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    #     # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    #         future = {executor.submit(
+    #             type(self).f, i, self.subindustry_nlp.copy(), self.industry_categories.copy()
+    #         ): i for i in unique_text}
+    #
+    #         for f in as_completed(future):
+    #             unique_results[future[f]] = f.result()
+    #
+    #     result = [{i: unique_results[i]} for i in text]
+    #
+    #     return result
+    #
+    # @staticmethod
+    # def f(text, subindustry_nlp, industry_categories):
+    #     nlp = spacy.load('en_core_web_lg')
+    #     text_nlp = nlp(text)
+    #
+    #     results = {}
+    #     
+    #     for subindustry in subindustry_nlp:
+    #         similarity = subindustry.similarity(text_nlp)
+    #         results[subindustry.text] = similarity
+    #
+    #     subindustry_result = max(results, key=results.get)
+    #     score = results[subindustry_result]
+    #
+    #     for k, v in industry_categories.items():
+    #         if subindustry_result in v:
+    #             industry_result = k
+    #             break
+    #
+    #     # in case industry and subindustry are the same, we go for 2nd best for subindustry
+    #     if subindustry_result == industry_result:
+    #         filtered_results = {
+    #             i: j for i, j in results.items() if i != industry_result \
+    #             and i in industry_categories[industry_result]
+    #         }
+    #         subindustry_result = max(filtered_results, key=filtered_results.get)
+    #         score = filtered_results[subindustry_result]
+    #
+    #     # if score < th:
+    #     #     return (None, None, None)
+    #     result = (industry_result, subindustry_result, score)
+    #     print(result)
+    #
+    #     return result 
 
 
 if __name__ == '__main__':
