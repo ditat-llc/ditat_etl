@@ -321,7 +321,7 @@ class PeopleDataLabs:
 
         elif check_existing and self.check_existing_method == 's3':
             if hasattr(self, 's3_as'):
-                existing = self.s3_as.website.tolist()
+                existing = self.s3_as.website.unique().tolist()
                 existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
                 sql += existing_str
 
@@ -340,6 +340,9 @@ class PeopleDataLabs:
           params=P
         ).json()
 
+        if verbose:
+            print(response)
+
         if response['status'] == 200:
             for company in response['data']:
                 id = company['id']
@@ -356,7 +359,7 @@ class PeopleDataLabs:
                     if s3_recalculate:
                         self.s3_setup(**self.s3_params)
 
-        return response['data']
+            return response['data']
     
     def search_person(
         self,
