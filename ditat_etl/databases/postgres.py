@@ -314,7 +314,11 @@ class Postgres:
                 df[col] = df[col].apply(literal_eval)
 
             elif data_type == dict:
-                df[col] = df[col].apply(literal_eval).apply(json.dumps)
+                try:
+                    df[col] = df[col].apply(literal_eval).apply(json.dumps)
+                except:
+                    # review this change, Portuguese and weird encodings
+                    pass
 
             elif data_type in [int, float]:
                 # Workaround: Cannot place None with numerical.

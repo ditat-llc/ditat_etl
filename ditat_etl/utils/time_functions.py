@@ -3,7 +3,7 @@ import re
 from functools import wraps
 
 
-def time_it(text=None):
+def time_it(text=None, decimals=4):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -18,7 +18,7 @@ def time_it(text=None):
             '''
             t1 = time.time()
             result = func(*args, **kwargs)
-            time_out = f"{func.__qualname__} time: {round(time.time() - t1, 3)}"
+            time_out = f"{func.__qualname__} time: {round(time.time() - t1, decimals)}"
             if text:
                 time_out += ", " + str(text)
             print(time_out)
