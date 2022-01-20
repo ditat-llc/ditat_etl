@@ -38,7 +38,6 @@ class NaicsStandard:
         self.naics_df['level'] = self.naics_df.Codes.str.len() / 2
         self.naics_df['nlp'] = self.naics_df.Titles.apply(self.nlp)
 
-    @time_it()
     def _classify(self, text, n=1, th=None):
         text_nlp = self.nlp(text)
 
@@ -75,6 +74,9 @@ class NaicsStandard:
             'similarity'
         ]]
 
+        print(f'Processed: {self.counter} / {self.total}', end='\r')
+        self.counter += 1
+
         return top_2
 
     @time_it()
@@ -82,6 +84,11 @@ class NaicsStandard:
         text = [text] if isinstance(text, str) else text
 
         unique_text = set(text)
+
+        self.total = len(unique_text)
+        self.counter = 1 
+        
+        print(f'To be processed: {self.total}')
 
         results = [self._classify(i, n=n, th=th) for i in unique_text]
 
