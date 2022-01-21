@@ -285,13 +285,25 @@ class PeopleDataLabs:
         self,
         required: str=None,
         strategy='AND',
-        size=1,
+        return_size=1,
         check_existing=True,
         save=True,
         verbose=True,
         s3_recalculate=True,
         **kwargs,
     ):
+        # Adding new filtering process 
+        s3_as_filtered = self.s3_as.copy()
+
+        for i, j in kwargs.items():
+            if i in s3_as_filtered.columns:
+                s3_as_filtered = s3_as_filtered[s3_as_filtered[i] == j.lower()]
+
+        print(f'Existing searched accounts with these parameters: {s3_as_filtered.shape[0]}')
+
+        if s3_as_filtered.shape[0] >= 100:
+            raise ValueError('You have to be more specific with the parameters. Add more.')
+
         url = f"{type(self).BASE_URL}/company/search"
 
         H = {
@@ -303,7 +315,9 @@ class PeopleDataLabs:
         sql = f"SELECT * FROM company WHERE"
 
         if kwargs:
-            where_str = f' {strategy} '.join([f"{k} = '{v}'" for k, v in kwargs.items()])
+            where_str = f' {strategy} '.join(
+                [f"{k} = '{v}'" for k, v in kwargs.items()]
+            )
             sql += ' '
             sql += where_str
 
@@ -320,8 +334,8 @@ class PeopleDataLabs:
                 sql += existing_str
 
         elif check_existing and self.check_existing_method == 's3':
-            if hasattr(self, 's3_as'):
-                existing = self.s3_as.website.unique().tolist()
+            if hasattr(self, 's3_as') and s3_as_filtered.shape[0] > 0:
+                existing = s3_as_filtered.website.unique().tolist()
                 existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
                 sql += existing_str
 
@@ -330,7 +344,7 @@ class PeopleDataLabs:
 
         P = {
           'sql': sql,
-          'size': size,
+          'size': return_size,
           'pretty': True
         }
 
@@ -340,8 +354,8 @@ class PeopleDataLabs:
           params=P
         ).json()
 
-        if verbose:
-            print(response)
+       # if verbose:
+        #     print(response)
 
         if response['status'] == 200:
             for company in response['data']:
