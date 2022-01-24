@@ -311,7 +311,10 @@ class Postgres:
             data_type = filtered_data_types[col]
 
             if data_type == list:
-                df[col] = df[col].apply(literal_eval)
+                try:
+                    df[col] = df[col].apply(literal_eval)
+                except:
+                    pass
 
             elif data_type == dict:
                 try:

@@ -24,6 +24,28 @@ class PeopleDataLabs:
         'person_search',
     ]
 
+    PERSON_SEARCH_COLUMNS = [
+        'id', 'full_name', 'first_name', 'middle_initial',
+        'middle_name', 'last_initial', 'last_name', 'gender',
+        'birth_year', 'birth_date', 'linkedin_url', 'linkedin_username',
+        'linkedin_id', 'facebook_url', 'facebook_username', 'facebook_id',
+        'twitter_url', 'twitter_username', 'github_url', 'github_username',
+        'work_email', 'personal_emails', 'mobile_phone', 'industry',
+        'job_title', 'job_title_role', 'job_title_sub_role', 'job_title_levels',
+        'job_company_id', 'job_company_name', 'job_company_website', 'job_company_size',
+        'job_company_founded', 'job_company_industry', 'job_company_linkedin_url', 'job_company_linkedin_id',
+        'job_company_facebook_url', 'job_company_twitter_url', 'job_company_location_name', 'job_company_location_locality',
+        'job_company_location_metro', 'job_company_location_region', 'job_company_location_geo', 'job_company_location_street_address',
+        'job_company_location_address_line_2', 'job_company_location_postal_code', 'job_company_location_country', 'job_company_location_continent',
+        'job_last_updated', 'job_start_date', 'location_name', 'location_locality',
+        'location_metro', 'location_region', 'location_country', 'location_continent',
+        'location_street_address', 'location_address_line_2', 'location_postal_code', 'location_geo',
+        'location_last_updated', 'phone_numbers', 'emails', 'interests',
+        'skills', 'location_names', 'regions', 'countries',
+        'street_addresses', 'experience', 'education', 'profiles',
+        'version_status.status', 'version_status.contains', 'version_status.previous_version', 'version_status.current_version' 
+    ]
+
     def __init__(
         self,
         api_key: str,
@@ -379,13 +401,27 @@ class PeopleDataLabs:
         self,
         required: str='work_email',
         strategy="AND",
-        size=1,
+        return_size=1,
         check_existing=True,
         save=True,
         verbose=True,
         s3_recalculate=True,
         **kwargs
     ):
+        # Adding new filtering process 
+        s3_ps_filtered = self.s3_ps.copy()
+
+        for i, j in kwargs.items():
+            if i not in type(self).PERSON_SEARCH_COLUMNS:
+                raise ValueError(f"{i} not valid. Check PeopleDataLabs.PERSON_SEARCH_COLUMNS")
+
+            else:
+                s3_ps_filtered = s3_ps_filtered[s3_ps_filtered[i] == j.lower()]
+
+        print(f'Existing searched person with these parameters: {s3_ps_filtered.shape[0]}')
+
+        if s3_ps_filtered.shape[0] >= 100:
+            raise ValueError('You have to be more specific with the parameters. Add more.')
 
         url = f"{type(self).BASE_URL}/person/search"
 
@@ -415,8 +451,8 @@ class PeopleDataLabs:
                 sql += existing_str
 
         elif check_existing and self.check_existing_method == 's3':
-            if hasattr(self, 's3_ps'):
-                existing = self.s3_ps['work_email'].tolist()
+            if hasattr(self, 's3_ps') and s3_ps_filtered.shape[0] > 0:
+                existing = s3_ps_filtered['work_email'].tolist()
                 existing_str =  ' AND work_email NOT IN (' + ', '.join([f"'{i}'" for i in existing]) + ')'
                 sql += existing_str
 
@@ -425,7 +461,7 @@ class PeopleDataLabs:
 
         P = {
           'sql': sql,
-          'size': size,
+          'size': return_size,
           'pretty': True
         }
 
