@@ -394,8 +394,8 @@ class PeopleDataLabs:
                     fmt_file = BytesIO(json.dumps(company).encode('UTF-8'))
                     self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
-                    if s3_recalculate:
-                        self.s3_setup(**self.s3_params)
+            if s3_recalculate:
+                self.s3_setup(**self.s3_params)
 
             return response['data']
     
@@ -516,8 +516,8 @@ class PeopleDataLabs:
                     fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
                     self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)        
 
-                    if s3_recalculate:
-                        self.s3_setup(**self.s3_params)
+            if s3_recalculate:
+                self.s3_setup(**self.s3_params)
 
         return response
 
