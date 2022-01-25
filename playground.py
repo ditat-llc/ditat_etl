@@ -5,23 +5,15 @@ Test stuff
 from ditat_etl.utils.enrichment import PeopleDataLabs
 
 pdl = PeopleDataLabs(
-    api_key='cfc0a579cd65fb5d2783cf6fcfc648393bacbd8063213998810b9d25b1b6d7de',
+    api_key='xxx',
     check_existing_method='s3',
     bucket_name='newfront-data-sets',
 )
 
-# r = pdl.search_company(
-#         **{
-#             'location.country': 'Chile',
-#         },
-#         return_size=1,
-#         s3_recalculate=False
-# )
-# r = pdl.search_person(
-#         **{
-#             "job_company_website": "stripe.com"
-#         },
-#         return_size=1
-# )
-#
-# print(r)
+r = pdl.search_person(
+        job_title_role=['finance', 'legal', 'real_estate', 'operations'],
+        job_title_levels=['cxo','director','owner','vp'],
+        job_company_website=['botc.com', 'aiains.com', 'startupweekend.org'],
+        return_size=1
+)
+

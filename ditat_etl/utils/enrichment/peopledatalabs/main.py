@@ -169,6 +169,7 @@ class PeopleDataLabs:
 
             s3_ae_db['domain'] = s3_ae_db['website'].apply(extract_domain)
             s3_ae_db = s3_ae_db.loc[(s3_ae_db['domain'] != 'nan') | (~s3_ae_db['domain'].isnull()), :]
+            s3_ae_db.dropna(subset=['domain'], inplace=True)
 
             s3_ae_db['data_source'] = 'people_data_labs'
 
@@ -189,6 +190,7 @@ class PeopleDataLabs:
 
             s3_as_db['domain'] = s3_as_db['website'].apply(extract_domain)
             s3_as_db = s3_as_db.loc[(s3_as_db['domain'] != 'nan') | (~s3_as_db['domain'].isnull()), :]
+            s3_as_db.dropna(subset=['domain'], inplace=True)
 
             s3_as_db['data_source'] = 'people_data_labs'
 
@@ -416,7 +418,19 @@ class PeopleDataLabs:
                 raise ValueError(f"{i} not valid. Check PeopleDataLabs.PERSON_SEARCH_COLUMNS")
 
             else:
-                s3_ps_filtered = s3_ps_filtered[s3_ps_filtered[i] == j.lower()]
+                # Pending case to handle lists and values in lists
+                if i in [
+                    'job_title_levels',
+                ]:
+                    continue
+                
+                elif isinstance(j, list):
+                    s3_ps_filtered = s3_ps_filtered[
+                        s3_ps_filtered[i].isin([w.lower() for w in j])
+                    ]
+
+                else:
+                    s3_ps_filtered = s3_ps_filtered[s3_ps_filtered[i] == j.lower()]
 
         print(f'Existing searched person with these parameters: {s3_ps_filtered.shape[0]}')
 
@@ -434,7 +448,22 @@ class PeopleDataLabs:
         sql = f"SELECT * FROM person WHERE"
 
         if kwargs:
-            where_str = f' {strategy} '.join([f"{k} LIKE '%{v}%'" for k, v in kwargs.items()])
+            where_str_list = []
+
+            for k, v in kwargs.items():
+
+                if isinstance(v, list):
+                    v_fmt = ', '.join([f"'{i}'" for i in v])
+                    kv_fmt = f"{k} IN ({v_fmt})" 
+
+                else:
+                    kv_fmt = f"{k} LIKE '%{v}%'"
+
+                where_str_list.append(kv_fmt)
+
+            where_str = f' {strategy} '.join(where_str_list)
+
+            # where_str = f' {strategy} '.join([f"{k} LIKE '%{v}%'" for k, v in kwargs.items()])
             sql += ' '
             sql += where_str
 
@@ -470,6 +499,9 @@ class PeopleDataLabs:
           headers=H,
           params=P
         ).json()
+
+        if verbose:
+            print(f"Status Code {response['status']}")
 
         if response['status'] == 200:
             for person in response['data']:

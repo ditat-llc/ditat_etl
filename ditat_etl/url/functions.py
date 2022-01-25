@@ -26,29 +26,47 @@ def extract_domain(url_or_email):
 def eval_url(
     url: str or list,
     max_workers: int=10000,
-    timeout=60,
+    timeout=10,
 ):
     '''
         This function can later be moved to class Url()
     '''
     url  = [url] if isinstance(url, str) else url
 
-    @time_it()
+    total = len(url) 
+    current = 1
+
+    # @time_it()
     def f(url):
+
+        nonlocal current
+
         if not url.startswith('http'):
             url2 = 'https://' + url
             url = 'http://' + url
         try:
             r = requests.get(url, timeout=timeout)
+            stm = f"Processed: {current} / {total}"
+            print(stm, end='\r')
+            current += 1
             return r.status_code
         except:
             try:
                 r = requests.get(url2, timeout=timeout)
+                stm = f"Processed: {current} / {total}"
+                print(stm, end='\r')
+                current += 1
                 return r.status_code
             except:
+                stm = f"Processed: {current} / {total}"
+                print(stm, end='\r')
+                current += 1
                 return None
 
-    with ThreadPoolExecutor(max_workers=min(len(url), max_workers)) as ex:
+    max_workers = min(len(url), max_workers) 
+    print(f'Initializing {max_workers} workers.')
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
         iterables = {i: ex.submit(f, url=i) for i in url}
         results = {i: j.result() for i, j in iterables.items()}
 
