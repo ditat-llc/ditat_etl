@@ -102,6 +102,29 @@ class Matcher:
         
         self._counter += 1
         self._names.append(name)
+
+    def dedupe(
+        self,
+        data: pd.DataFrame,
+        index='id',
+        domain=None,
+        address=None,
+        phone=None,
+        country=None,
+        entity_name: str=None
+    ):
+        vars = locals().copy()
+
+        left = vars.copy()
+        left['name'] = 'left'
+
+        right = vars.copy()
+        right['name'] = 'right'
+
+        type(self).set_df(**left)
+        type(self).set_df(**right)
+
+        self.run(save=True, deduping=True)
     
     @staticmethod
     def clean_field(x):
@@ -111,6 +134,8 @@ class Matcher:
             x = x.replace(r, "")
         x = x.split()
         x = sorted(x)
+        if len(x) < 2:
+            return None
         return str(x)
 
     def generic(function):
@@ -197,7 +222,7 @@ class Matcher:
         df_1[var] = df_1.apply(lambda x: Phone.format(x[self.frame__1.phone], x[self.frame__1.country]), axis=1)
         df_2[var] = df_2.apply(lambda x: Phone.format(x[self.frame__2.phone], x[self.frame__2.country]), axis=1)
 
-    def run(self, save=False, verbose=True):
+    def run(self, save=False, verbose=True, deduping=False):
         # Run individual matches according to attribute in self.features_candidates and concatenate.
         for feature in self.features_candidates:
             setattr(
@@ -238,155 +263,48 @@ class Matcher:
             results.insert(0, col, f_col)
 
         # Filtering according to match_type and match_count
-        results = results.loc[ 
-            (results.match_count >= 2)
-            | (results.match_type == '["domain"]'),
-            :
-        ]
+        if deduping:
+
+            def f(row):
+                a = row[self.frame__1.index]
+                b = row[self.frame__2.index]
+                r = sorted([a, b])
+                return str(r)
+
+            results['temp']= results.apply(f, axis=1)
+
+            results.drop_duplicates(subset=['match_type', 'temp'], inplace=True)
+
+            results.drop('temp', axis=1, inplace=True)
+
+            results = results.loc[ 
+                (results.match_count >= 3)
+                | (results.match_type.isin(['["domain"]', '["entity_name"]]']))
+                | (results.match_type.str.contains('entity_name')),
+                :
+            ]
+
+        else:
+            results = results.loc[ 
+                (results.match_count >= 2)
+                | (results.match_type.isin(['["domain"]'])),
+                :
+            ]
+
+        # Summary
+        group_summary_index = results[self.frame__1.index].value_counts().index
+        group_summary = pd.Series(index=group_summary_index, data=range(group_summary_index.shape[0]))
+
+        results.insert(2, 'match_group', results[self.frame__1.index].map(group_summary))
+        results.sort_values(['match_group', 'match_count'], ascending=[True, False], inplace=True)
+        
         print(f"Results filtered: {results.shape[0]}")
 
+        # Deduping against itself
+        if deduping:
+            results = results[results[self.frame__1.index] != results[self.frame__2.index]]
+
         self.results = results
+
         if save:
             self.results.to_csv(f'matches.csv', index=False)
-
-
-
-
-    # def phone(self, verbose=False):
-    #     if all([
-    #         self.frame__1.phone,
-    #         self.frame__1.country,
-    #         self.frame__2.phone,
-    #         self.frame__2.country
-    #     ]):
-    #         var = 'phone_fmt'
-    #
-    #         df_1 = self.frame__1.data.copy()
-    #         df_2 = self.frame__2.data.copy()
-    #
-    #         df_1.dropna(subset=[self.frame__1.phone], inplace=True)
-    #         df_2.dropna(subset=[self.frame__2.phone], inplace=True)
-    #
-    #         df_1[var] = df_1.apply(lambda x: Phone.format(x[self.frame__1.phone], x[self.frame__1.country]), axis=1)
-    #         df_2[var] = df_2.apply(lambda x: Phone.format(x[self.frame__2.phone], x[self.frame__2.country]), axis=1)
-    #
-    #         df_1.dropna(subset=[var], inplace=True)
-    #         df_2.dropna(subset=[var], inplace=True)
-    #
-    #         matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
-    #         matches = matches[~matches[self.frame__2.index].isnull()]
-    #
-    #         matches = matches[[self.frame__1.index, self.frame__2.index, var]]
-    #         if verbose:
-    #             print(f'Phone matches: {matches.shape[0]}')
-    #
-    #         matches['match_type'] = 'phone'
-    #
-    #         return matches
-    #
-    # def domain(self, verbose=False):
-    #     if all([
-    #         self.frame__1.domain,
-    #         self.frame__2.domain
-    #     ]):
-    #         var = 'domain_fmt'
-    #
-    #         df_1 = self.frame__1.data.copy()
-    #         df_2 = self.frame__2.data.copy()
-    #
-    #         df_1.dropna(subset=[self.frame__1.domain], inplace=True)
-    #         df_2.dropna(subset=[self.frame__2.domain], inplace=True)
-    #
-    #         if self.exact_domain:
-    #             df_1[var] = df_1[self.frame__1.domain]
-    #             df_2[var] = df_2[self.frame__2.domain]
-    #         else:
-    #             df_1[var] = df_1[self.frame__1.domain].apply(extract_domain)
-    #             df_2[var] = df_2[self.frame__2.domain].apply(extract_domain)
-    #
-    #         # Skip domains that are part of self.ignored_domains
-    #         # Evaluate moving this to the url.functions extract_domain
-    #         df_1 = df_1[~df_1[var].isin(self.ignored_domains)]
-    #         df_2 = df_2[~df_2[var].isin(self.ignored_domains)]
-    #
-    #         df_1.dropna(subset=[var], inplace=True)
-    #         df_2.dropna(subset=[var], inplace=True)
-    #
-    #         matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
-    #         matches = matches[~matches[self.frame__2.index].isnull()]
-    #
-    #         matches = matches[[self.frame__1.index, self.frame__2.index, var]]
-    #         if verbose:
-    #             print(f'Domain matches: {matches.shape[0]}')
-    #
-    #         matches['match_type'] = 'domain'
-    #
-    #         return matches
-    #
-    # def address(self, verbose=False):
-    #     if all([
-    #         self.frame__1.address,
-    #         self.frame__2.address
-    #     ]):
-    #         var = 'address_fmt'
-    #
-    #         df_1 = self.frame__1.data.copy()
-    #         df_2 = self.frame__2.data.copy()
-    #
-    #         df_1.dropna(subset=[self.frame__1.address], inplace=True)
-    #         df_2.dropna(subset=[self.frame__2.address], inplace=True)
-    #
-    #         df_1[var] = df_1[self.frame__1.address]
-    #         df_2[var] = df_2[self.frame__2.address]
-    #
-    #         # Custom
-    #         df_1[var] = df_1[var].apply(type(self).clean_field)
-    #         df_2[var] = df_2[var].apply(type(self).clean_field)
-    #         ####
-    #
-    #         matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
-    #         matches = matches[~matches[self.frame__2.index].isnull()]
-    #
-    #         matches = matches[[self.frame__1.index, self.frame__2.index, var]]
-    #         if verbose:
-    #             print(f'Address matches: {matches.shape[0]}')
-    #
-    #         matches['match_type'] = 'address'
-    #
-    #         return matches
-    #
-    # def entity_name(self, verbose=False):
-    #     if all([
-    #         self.frame__1.entity_name,
-    #         self.frame__2.entity_name
-    #     ]):
-    #         var = 'entity_name_fmt'
-    #
-    #         df_1 = self.frame__1.data.copy()
-    #         df_2 = self.frame__2.data.copy()
-    #
-    #         df_1.dropna(subset=[self.frame__1.entity_name], inplace=True)
-    #         df_2.dropna(subset=[self.frame__2.entity_name], inplace=True)
-    #
-    #         df_1[var] = df_1[self.frame__1.entity_name]
-    #         df_2[var] = df_2[self.frame__2.entity_name]
-    #
-    #         # Custom
-    #         df_1[var] = df_1[var].apply(type(self).clean_field)
-    #         df_2[var] = df_2[var].apply(type(self).clean_field)
-    #         ####
-    #
-    #         matches = pd.merge(df_1, df_2, on=var, how='left',  suffixes=(self.frame__1.suffix, self.frame__2.suffix))
-    #         matches = matches[~matches[self.frame__2.index].isnull()]
-    #
-    #         matches = matches[[self.frame__1.index, self.frame__2.index, var]]
-    #         if verbose:
-    #             print(f'Entity name matches: {matches.shape[0]}')
-    #
-    #         matches['match_type'] = 'entity_name'
-    #
-    #         return matches
-
-
-
-

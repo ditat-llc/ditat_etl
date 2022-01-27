@@ -86,7 +86,6 @@ class CountryStandard:
         self.counter += 1
 
         return result
-        
 
     @time_it()
     def classify(self, text):

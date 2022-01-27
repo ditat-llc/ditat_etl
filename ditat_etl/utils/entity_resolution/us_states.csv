@@ -1,0 +1,54 @@
+state,code,fips
+alabama,al,01
+alaska,ak,02
+arizona,az,04
+arkansas,ar,05
+california,ca,06
+colorado,co,08
+connecticut,ct,09
+delaware,de,10
+district of columbia,dc,11
+florida,fl,12
+georgia,ga,13
+hawaii,hi,15
+idaho,id,16
+illinois,il,17
+indiana,in,18
+iowa,ia,19
+kansas,ks,20
+kentucky,ky,21
+louisiana,la,22
+maine,me,23
+maryland,md,24
+massachusetts,ma,25
+michigan,mi,26
+minnesota,mn,27
+mississippi,ms,28
+missouri,mo,29
+montana,mt,30
+nebraska,ne,31
+nevada,nv,32
+new hampshire,nh,33
+new jersey,nj,34
+new mexico,nm,35
+new york,ny,36
+north carolina,nc,37
+north dakota,nd,38
+ohio,oh,39
+oklahoma,ok,40
+oregon,or,41
+pennsylvania,pa,42
+puerto rico,pr,72
+rhode island,ri,44
+south carolina,sc,45
+south dakota,sd,46
+tennessee,tn,47
+texas,tx,48
+utah,ut,49
+vermont,vt,50
+virginia,va,51
+virgin islands,vi,78
+washington,wa,53
+west virginia,wv,54
+wisconsin,wi,55
+wyoming,wy,56
