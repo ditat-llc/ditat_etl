@@ -111,7 +111,10 @@ class Matcher:
         address=None,
         phone=None,
         country=None,
-        entity_name: str=None
+        entity_name: str=None,
+        match_type_included=None,
+        match_type_excluded=None,
+        match_count_th=3,
     ):
         vars = locals().copy()
 
@@ -121,10 +124,29 @@ class Matcher:
         right = vars.copy()
         right['name'] = 'right'
 
-        type(self).set_df(**left)
-        type(self).set_df(**right)
+        type(self).set_df(
+            **{i: j for i, j in left.items() if i in self.set_df.__code__.co_varnames}
+        )
+        type(self).set_df(
+            **{i: j for i, j in right.items() if i in self.set_df.__code__.co_varnames}
+        )
+        match_type_included = match_type_included or [   
+            ['domain'],
+            ['entity_name'],
+            ['domain', 'entity_name'],
+            ['domain', 'address'],
+            ['domain', 'phone'],
+            ['entity_name', 'address'],
+            ['entity_name', 'phone'],
+        ]
 
-        self.run(save=True, deduping=True)
+        self.run(
+            save=True,
+            deduping=True,
+            match_type_included=match_type_included,
+            match_type_excluded=match_type_excluded,
+            match_count_th=match_count_th or 3
+        )
     
     @staticmethod
     def clean_field(x):
@@ -222,7 +244,33 @@ class Matcher:
         df_1[var] = df_1.apply(lambda x: Phone.format(x[self.frame__1.phone], x[self.frame__1.country]), axis=1)
         df_2[var] = df_2.apply(lambda x: Phone.format(x[self.frame__2.phone], x[self.frame__2.country]), axis=1)
 
-    def run(self, save=False, verbose=True, deduping=False):
+    def run(
+        self,
+        save=False,
+        verbose=True,
+        deduping=False,
+        match_type_included=None,
+        match_type_excluded=None,
+        match_count_th=3,
+    ):
+        if not match_type_included:
+            match_type_included = [   
+                ['domain'],
+                ['domain', 'entity_name'],
+                ['domain', 'address'],
+                ['domain', 'phone'],
+                ['entity_name', 'address'],
+                ['entity_name', 'phone'],
+            ]
+
+        match_type_excluded = match_type_excluded or []
+
+        match_type_excluded = [json.dumps(sorted(i)) for i in match_type_excluded]
+
+        match_type_included = [json.dumps(sorted(i)) for i in match_type_included]
+        match_type_included = [i for i in match_type_included if i not in match_type_excluded]
+
+
         # Run individual matches according to attribute in self.features_candidates and concatenate.
         for feature in self.features_candidates:
             setattr(
@@ -239,7 +287,7 @@ class Matcher:
         self.all_matches = self.all_matches.groupby([self.frame__1.index, self.frame__2.index]).agg({'match_type': ['count', list]})
         columns = ['match_count', 'match_type']
         self.all_matches.columns = columns
-        self.all_matches['match_type'] = self.all_matches['match_type'].apply(json.dumps)
+        self.all_matches['match_type'] = self.all_matches['match_type'].apply(lambda x: json.dumps(sorted(x)))
         self.all_matches.sort_values(['match_count', 'match_type'], ascending=False, inplace=True)
         self.all_matches.reset_index(inplace=True)
 
@@ -262,7 +310,6 @@ class Matcher:
             f_col = results.pop(col)
             results.insert(0, col, f_col)
 
-        # Filtering according to match_type and match_count
         if deduping:
 
             def f(row):
@@ -277,32 +324,49 @@ class Matcher:
 
             results.drop('temp', axis=1, inplace=True)
 
-            results = results.loc[ 
-                (results.match_count >= 3)
-                | (results.match_type.isin(['["domain"]', '["entity_name"]]']))
-                | (results.match_type.str.contains('entity_name')),
-                :
-            ]
-
-        else:
-            results = results.loc[ 
-                (results.match_count >= 2)
-                | (results.match_type.isin(['["domain"]'])),
-                :
-            ]
-
-        # Summary
-        group_summary_index = results[self.frame__1.index].value_counts().index
-        group_summary = pd.Series(index=group_summary_index, data=range(group_summary_index.shape[0]))
-
-        results.insert(2, 'match_group', results[self.frame__1.index].map(group_summary))
-        results.sort_values(['match_group', 'match_count'], ascending=[True, False], inplace=True)
-        
-        print(f"Results filtered: {results.shape[0]}")
-
-        # Deduping against itself
-        if deduping:
             results = results[results[self.frame__1.index] != results[self.frame__2.index]]
+
+        # Filtering according to match_type and match_count
+        results = results.loc[ 
+            (results.match_count >= match_count_th)
+            | (results.match_type.isin(match_type_included)),
+            :
+        ]
+
+        # Match Grouping
+        group_dict = {}
+        counter = 0
+        
+        for index, row in results.iterrows():
+
+            li = row[self.frame__1.index]
+            ri = row[self.frame__2.index]
+
+            if li in group_dict:
+                group = group_dict[li]
+                group_dict[ri] = group
+
+            elif ri in group_dict:
+                group = group_dict[ri]
+                group_dict[li] = group
+
+            else:
+                group = counter
+                group_dict[li] = group
+                group_dict[ri] = group
+
+                counter += 1
+
+        results.insert(2, 'match_group', results[self.frame__1.index].map(group_dict))
+
+        # Sorting according to value counts of match_group and match_count
+        sorting = results.match_group.value_counts()
+        results['temp_sort'] = results.match_group.map(sorting)
+
+        results.sort_values(['temp_sort', 'match_group', 'match_count'], ascending=[False, True, False], inplace=True)
+        results.drop('temp_sort', axis=1, inplace=True)
+
+        print(f"Results filtered: {results.shape[0]}")
 
         self.results = results
 
