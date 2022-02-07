@@ -420,7 +420,10 @@ class Postgres:
 
         table_data_types = self.get_table_data_types(tablename)
         # following line used for coalesce and casting
-        table_raw_data_types = {i: j for i, j in self.get_table_data_types(tablename, sql_types=True).items() if j not in ['ARRAY']}
+        # table_raw_data_types = {i: j for i, j in self.get_table_data_types(tablename, sql_types=True).items() if j not in ['ARRAY']}
+        table_raw_data_types = {
+            i: (j if j not in ['ARRAY'] else 'varchar[]') for i, j in self.get_table_data_types(tablename, sql_types=True).items()
+        }
         table_columns = list(table_data_types.keys())
 
         for col in df.columns:

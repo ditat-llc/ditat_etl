@@ -115,6 +115,7 @@ class Matcher:
         match_type_included=None,
         match_type_excluded=None,
         match_count_th=3,
+        include_all=True
     ):
         vars = locals().copy()
 
@@ -325,7 +326,7 @@ class Matcher:
 
             results.drop('temp', axis=1, inplace=True)
 
-            # We mark the matches of the same row as 99.
+            # results = results[results[self.frame__1.index] != results[self.frame__2.index]]
             results.loc[results[self.frame__1.index] == results[self.frame__2.index], 'match_count'] = 99
 
         # Filtering according to match_type and match_count

@@ -46,17 +46,37 @@ def eval_url(
             url = 'http://' + url
         try:
             r = requests.get(url, timeout=timeout)
+
             stm = f"Processed: {current} / {total}"
             print(stm, end='\r')
+
             current += 1
-            return r.status_code
+            status_code = r.status_code
+
+            if status_code != 200:
+                return False
+
+            fmt_resp_url = extract_domain(r.url)
+
+            return fmt_resp_url
+
         except:
             try:
                 r = requests.get(url2, timeout=timeout)
+
                 stm = f"Processed: {current} / {total}"
                 print(stm, end='\r')
+
                 current += 1
-                return r.status_code
+                status_code = r.status_code
+
+                if status_code != 200:
+                    return False
+
+                fmt_resp_url = extract_domain(r.url)
+
+                return fmt_resp_url
+
             except:
                 stm = f"Processed: {current} / {total}"
                 print(stm, end='\r')
