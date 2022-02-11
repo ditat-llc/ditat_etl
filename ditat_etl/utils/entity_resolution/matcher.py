@@ -168,6 +168,7 @@ class Matcher:
                 result = [extract_domain(i) for i in result]
 
             result = [i for i in result if i not in (None, np.nan)]
+            result = [i for i in result if str(i) != 'nan']
             return result
 
         for col in self.frame__1.data:
@@ -183,7 +184,7 @@ class Matcher:
 
         def agg_function(row): 
             result = list(set(
-                [item.lower() for sublist in row for item in sublist]
+                [item for sublist in row for item in sublist]
             ))
             return result
 
@@ -204,6 +205,8 @@ class Matcher:
 
         if save:
             results.to_csv('dedupes.csv', index=False)
+
+        print(f'Original dataframe after deduping: {results.shape[0]}')
 
         return results
         ###
