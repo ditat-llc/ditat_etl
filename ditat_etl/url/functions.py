@@ -38,6 +38,8 @@ def eval_url(
 
     # @time_it()
     def f(url):
+        if not url:
+            return None
 
         nonlocal current
 

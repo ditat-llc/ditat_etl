@@ -3,6 +3,7 @@ import os
 from functools import wraps
 
 import pandas as pd
+import numpy as np
 
 from ..phones import Phone
 from ...url.functions import extract_domain
@@ -112,10 +113,14 @@ class Matcher:
         phone=None,
         country=None,
         entity_name: str=None,
+        save=True,
         match_type_included=None,
         match_type_excluded=None,
         match_count_th=3,
+        include_self=True
     ):
+        self.include_self = include_self
+
         vars = locals().copy()
 
         left = vars.copy()
@@ -131,8 +136,8 @@ class Matcher:
             **{i: j for i, j in right.items() if i in self.set_df.__code__.co_varnames}
         )
         match_type_included = match_type_included or [   
-            ['domain'],
-            ['entity_name'],
+            # ['domain'],
+            # ['entity_name'],
             ['domain', 'entity_name'],
             ['domain', 'address'],
             ['domain', 'phone'],
@@ -141,12 +146,60 @@ class Matcher:
         ]
 
         self.run(
-            save=True,
+            save=save,
             deduping=True,
             match_type_included=match_type_included,
             match_type_excluded=match_type_excluded,
             match_count_th=match_count_th or 3,
-    )
+        )
+        ### EXPERIMENTAL PART
+        results = self.results.copy()
+
+        if results.shape[0] == 0:
+            return None
+
+        index_col = getattr(self.frame__1, 'index').replace('_left', '')
+
+        def agg_function(row): 
+            result = list(set(
+                [item.lower() for sublist in row for item in sublist]
+            ))
+            return result
+
+        for col in self.frame__1.data:
+
+            column_name = col.replace('_left', '')
+            one = col
+            two = col.replace('_left', '_right')
+
+            results[f"{column_name}__agg"] = results.apply(
+                lambda x: list(set(
+                    [i for i in [x[one]] if i not in (None, np.nan)] + \
+                    [i for i in [x[two]] if i not in (None, np.nan)]
+                )),
+                axis=1
+            )
+
+        results = results.groupby('match_group')[[
+            col for col in results if col.endswith('__agg')
+        ]].agg(agg_function)
+
+        results.columns = [col.replace('__agg', '') for col in results.columns]
+
+        results['temp'] =  results[index_col].str.len()
+
+        results.sort_values(
+            'temp',
+            inplace=True,
+            ascending=False
+        )
+        results.drop('temp', inplace=True, axis=1)
+
+        if save:
+            results.to_csv('dedupes.csv', index=False)
+
+        return results
+        ###
     
     @staticmethod
     def clean_field(x):
@@ -156,7 +209,7 @@ class Matcher:
             x = x.replace(r, "")
         x = x.split()
         x = sorted(x)
-        x = [i for i in x if len(i) >= 2]
+        x = [i for i in x if len(i) >= 1]
 
         if len(x) >= 1:
             return str(x)
@@ -326,7 +379,11 @@ class Matcher:
             results.drop('temp', axis=1, inplace=True)
 
             # We mark the matches of the same row as 99.
-            results.loc[results[self.frame__1.index] == results[self.frame__2.index], 'match_count'] = 99
+            if self.include_self is True:
+                results.loc[results[self.frame__1.index] == results[self.frame__2.index], 'match_count'] = 99
+
+            else:
+                results = results[results[self.frame__1.index] != results[self.frame__2.index]]
 
         # Filtering according to match_type and match_count
         results = results.loc[ 
@@ -374,3 +431,5 @@ class Matcher:
 
         if save:
             self.results.to_csv(f'matches.csv', index=False)
+
+        return self.results
