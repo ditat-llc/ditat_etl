@@ -160,10 +160,14 @@ class Matcher:
 
         index_col = getattr(self.frame__1, 'index').replace('_left', '')
 
-        def agg_function(row): 
-            result = list(set(
-                [item.lower() for sublist in row for item in sublist]
-            ))
+        def row_function(x, one, two):
+            result = list(set([x[one], x[two]])) 
+
+            # Domain
+            if one == getattr(self.frame__1, 'domain'):
+                result = [extract_domain(i) for i in result]
+
+            result = [i for i in result if i not in (None, np.nan)]
             return result
 
         for col in self.frame__1.data:
@@ -173,12 +177,15 @@ class Matcher:
             two = col.replace('_left', '_right')
 
             results[f"{column_name}__agg"] = results.apply(
-                lambda x: list(set(
-                    [i for i in [x[one]] if i not in (None, np.nan)] + \
-                    [i for i in [x[two]] if i not in (None, np.nan)]
-                )),
+                lambda x: row_function(x, one, two),
                 axis=1
-            )
+            ) 
+
+        def agg_function(row): 
+            result = list(set(
+                [item.lower() for sublist in row for item in sublist]
+            ))
+            return result
 
         results = results.groupby('match_group')[[
             col for col in results if col.endswith('__agg')
