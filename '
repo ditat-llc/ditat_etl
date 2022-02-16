@@ -1,0 +1,12 @@
+'''
+Test stuff
+'''
+
+
+from ditat_etl.utils.entity_resolution import Matcher
+
+s = "Carmelita's Mexican Restaurant"
+
+r = Matcher.clean_field(s)
+
+print(r)

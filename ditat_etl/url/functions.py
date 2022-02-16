@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 import re
+import os
 
 from concurrent.futures import ThreadPoolExecutor
 import requests
@@ -7,19 +8,39 @@ import requests
 from ..utils.time_functions import time_it
 
 
-def extract_domain(url_or_email):
-    url_or_email = str(url_or_email)
+filedir = os.path.abspath(os.path.dirname(__file__))
+ignored_domains_path = os.path.join(filedir, 'domains_ignored.txt')
+
+with open(ignored_domains_path, 'r') as f:
+    ignored_domains = f.read().splitlines()
+
+
+def extract_domain(
+    url_or_email,
+    ignore_domains=False,
+    ignored_domains=ignored_domains
+):
+    url_or_email = url_or_email if type(url_or_email) == str else str(url_or_email)
+
+    result = None
+
     if '@' in url_or_email:
         regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         if re.fullmatch(regex, url_or_email):
             domain = url_or_email.split('@')[1]
             if domain:
-                return domain
+                result = domain
     else:
-        url_or_email = f'http://{url_or_email}' if not url_or_email.startswith('http') else url_or_email
+        url_or_email = f'http://{url_or_email}' \
+            if not url_or_email.startswith('http') else url_or_email
         domain = urlparse(url_or_email.replace('www.', '')).netloc
         if domain and '.' in domain:
-            return domain
+            result = domain
+
+    if ignore_domains and result in ignored_domains: 
+        return None
+
+    return result
 
 
 @time_it()

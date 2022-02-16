@@ -1,3 +1,4 @@
+import re
 import json
 import os
 from functools import wraps
@@ -213,13 +214,46 @@ class Matcher:
     
     @staticmethod
     def clean_field(x):
-        x = x.lower()
-        replacements = [",", ".", '"', "'", "!", "?", "/"]
+        combo_replacements = [
+            "'s", "s.a.", "p.c.", "n.a."
+        ]
+        for r in combo_replacements:
+            x = x.replace(r, " ")
+
+        x = re.sub("([\(\[]).*?([\)\]])", "\g<1>\g<2>", x)
+
+        replacements = [
+            ",", ".", '"', "'", "!", "?", "/", "-", "&", "#", "%",
+            "@", "$", '^', "*", "(", ")", "+", "\\", ">", "<", "'s",
+            "'S"
+        ]
         for r in replacements:
-            x = x.replace(r, "")
+            x = x.replace(r, " ")
+
+        x = re.sub('([A-Z][a-z]+)', r' \1', re.sub('([A-Z]+)', r' \1', x))
+
+        x = x.lower()
         x = x.split()
         x = sorted(x)
         x = [i for i in x if len(i) >= 1]
+
+        excluded_names = [
+            'llc', 'inc', 'corp', 'co', 'ltd', 'and',
+            'group', 'of', 'the', 'group', 'union',
+            'company', 'ctr', 'sac', 'care', 'limited',
+            'store', 'medical', 'lp', 'medical', 'service',
+            'services', 'corps', 'lab', 'labs', 'incorporated',
+            'fzc', 'design', 'designs', "srl", "club", "builder",
+            "builders", "clothing", "sport", "sports", "residential",
+            "logistic", "logistics", "pvt", "system", "systems", 
+            "clubs", "industry", "industries", "specialist", "specialists",
+            "system", "systems", "restaurant", "restaurants", "institute",
+            "education", "center", "network" 
+
+        ]
+        x = [i for i in x if i not in excluded_names]
+
+        x = [i[:-1] if i[-1] == 's' and len(i) > 2 else i for i in x]
 
         if len(x) >= 1:
             return str(x)
@@ -333,7 +367,6 @@ class Matcher:
 
         match_type_included = [json.dumps(sorted(i)) for i in match_type_included]
         match_type_included = [i for i in match_type_included if i not in match_type_excluded]
-
 
         # Run individual matches according to attribute in self.features_candidates and concatenate.
         for feature in self.features_candidates:
