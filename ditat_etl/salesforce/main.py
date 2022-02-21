@@ -1,4 +1,5 @@
 import os
+import json
 import inspect
 from datetime import timedelta, datetime, date
 import requests
@@ -9,10 +10,11 @@ from simple_salesforce import Salesforce
 
 from ..utils.time_functions import time_it
 
-class SalesforceObj():
 
-    CLIENT_ID = "3MVG9p1Q1BCe9GmDarvSdIH1_Ocf_mJyrDOcyZJw5jnkRo1l8VaBiV2ZD1VAXWJg6H2Pb7wH9wCJSJOsuwS2e"
-    CLIENT_SECRET = "BCB4DC4C2547317103540821AE944C56B7C9329FBD6A2059AA3CD9E7AC711CE8"
+filedir = os.path.abspath(os.path.dirname(__file__))
+
+
+class SalesforceObj():
     
     TYPES_MAPPING = {
         'string': str,
@@ -37,15 +39,34 @@ class SalesforceObj():
     # @time_it()
     def __init__(
         self,
-        config
+        config,
+        client_id=None,
+        client_secret=None,
         ):
         req_params =  inspect.getargspec(Salesforce)[0] # Evaluate if neccesary, maybe not.
         self.config_params = {i: j for i, j in config.items() if i in req_params}
         self.config_params['version'] = '53.0'
+
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.load_client_credentials()
         
         self.access_token = None
         self.instance_url = None
         self.login()
+
+    def load_client_credentials(self):
+        if not self.client_id or not self.client_secret:
+            with open(os.path.join(filedir, 'credentials.json'), 'r') as f:
+                file = f.read()
+
+                try:
+                    credentials = json.loads(file)
+                except Exception:
+                    print('Could not load SF client credentials.')
+
+            self.client_id = credentials.get('CLIENT_ID')
+            self.client_secret = credentials.get('CLIENT_SECRET')
 
     def login(self):
         '''
@@ -83,8 +104,8 @@ class SalesforceObj():
         '''
         payload = {
             'grant_type': 'refresh_token',
-            'client_id': client_id or type(self).CLIENT_ID,
-            'client_secret': client_secret or type(self).CLIENT_SECRET,
+            'client_id': client_id or self.client_id,
+            'client_secret': client_secret or self.client_secret,
             'refresh_token': refresh_token
         }
         resp = requests.post(url=url, data=payload).json()
