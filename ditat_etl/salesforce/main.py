@@ -60,13 +60,13 @@ class SalesforceObj():
             with open(os.path.join(filedir, 'credentials.json'), 'r') as f:
                 file = f.read()
 
-                try:
-                    credentials = json.loads(file)
-                except Exception:
-                    print('Could not load SF client credentials.')
+            try:
+                credentials = json.loads(file)
+                self.client_id = credentials.get('CLIENT_ID')
+                self.client_secret = credentials.get('CLIENT_SECRET')
 
-            self.client_id = credentials.get('CLIENT_ID')
-            self.client_secret = credentials.get('CLIENT_SECRET')
+            except Exception:
+                print('Could not load SF client credentials.')
 
     def login(self):
         '''
