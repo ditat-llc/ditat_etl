@@ -77,7 +77,6 @@ class Matcher:
             - country (str, default=None)
             - entity_name (str, default=None): Company/Person Name,
                 do not confuse with name
-                
 
         Note:
             - Since the matching might either have One to One relationship
@@ -469,6 +468,8 @@ class Matcher:
         results.drop('temp_sort', axis=1, inplace=True)
 
         print(f"Results filtered: {results.shape[0]}")
+
+        print(f"N Unique rows: {results['match_group'].nunique()}")
 
         self.results = results
 

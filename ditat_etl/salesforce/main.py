@@ -133,6 +133,10 @@ class SalesforceObj():
                     {}
             '''.format(tablename)
             count = self.sf.query(query).get('records')[0].get('expr0')
+
+            if count == 0:
+                return None
+
             return True
 
         except Exception as e:
