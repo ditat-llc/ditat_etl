@@ -19,10 +19,12 @@ class SalesforceObj():
     TYPES_MAPPING = {
         'string': str,
         'reference': str,
-        'datetime': datetime,
+        # 'datetime': datetime,
+        'datetime': 'datetime64',
         'picklist': list,
         'boolean': bool,
-        'date': date,
+        # 'date': date,
+        'date': 'datetime64',
         'double': float,
         'phone': str,
         'url': str,
@@ -181,7 +183,12 @@ class SalesforceObj():
         mapping = info.set_index('name')['python_type'].to_dict()
         mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
 
-        df = df.astype(mapping, errors='ignore')
+        for k, v in mapping.items():
+            df[k] = df[k].astype(v, errors='ignore')
+
+            if v == 'datetime64':
+                df[k] = df[k].dt.strftime('%Y-%m-%dT00:00:00.000Z')
+
         df = df.where(pd.notnull(df), None)
         df.fillna(0, inplace=True) # Temp, it has to be None-> NULL
         return df
@@ -426,6 +433,7 @@ class SalesforceObj():
         batch_size: int=10000,
         update=True,
         conflict_on='Name',
+        return_response=False,
     ):
         '''
         Args:
@@ -463,6 +471,9 @@ class SalesforceObj():
 
         response_payload = {"inserted": insert_successes, 'failures': failures}
 
+        if return_response:
+            response_payload['result'] = result
+
         if update:
             df['sf_status'] = [i['success'] for i in result] 
 
@@ -496,6 +507,9 @@ class SalesforceObj():
                     response_payload['failures'] -= 1
 
             response_payload['updated'] = update_successes
+
+            if return_response:
+                response_payload['update_result'] = update_results
 
         return response_payload 
 
