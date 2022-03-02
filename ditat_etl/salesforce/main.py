@@ -6,6 +6,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
+import numpy as np
 from simple_salesforce import Salesforce
 
 from ..utils.time_functions import time_it
@@ -442,7 +443,9 @@ class SalesforceObj():
             - batch_size (int, default=10_000): Salesforce default.
             - update (bool, default=True): Try updating records that have conflict on
                 unique column.
-            - conflict_on (str, defualt='Name'): Specify unique column constrain
+            - conflict_on (str, default='Name'): Specify unique column constrain
+            - return_response (bool, default=False): Include in response_payload
+                the raw response from the Salesforce Api.
 
         Returns:
             - response_payload (dict): {"inserted": 2, 'failures': 0, "updated": 3}
@@ -455,6 +458,14 @@ class SalesforceObj():
 
         data = df.to_dict(orient='records')
 
+        # Fix for nan
+        data_list = []
+        for d in data:
+            new = {i: (None if j in [np.nan, 'nan'] else j) for i, j in d.items()}
+            data_list.append(new)
+
+        data = data_list
+
         bulk_handler = getattr(self.sf, "bulk")
         bulk_object = getattr(bulk_handler,  tablename)
 
@@ -466,6 +477,7 @@ class SalesforceObj():
         for r in result:
             if r['success'] == True:
                 insert_successes += 1
+
             elif r['success'] == False:
                 failures += 1
 
@@ -479,37 +491,43 @@ class SalesforceObj():
 
             df_to_update = df.loc[df.sf_status == False]
 
-            df_to_update[conflict_on] = df_to_update[conflict_on].str.replace("'", "\\'")
+            if df_to_update.shape[0] > 0:
 
-            fmt_where = df_to_update[conflict_on].tolist()
-            fmt_where = ','.join([f"'{i}'" for i in fmt_where])
+                df_to_update[conflict_on] = df_to_update[conflict_on].str.replace("'", "\\'")
 
-            query = f'SELECT Id, {conflict_on} FROM {tablename} WHERE {conflict_on} IN ({fmt_where})' 
-            results = self.sf.query_all(query, include_deleted=True, timeout=None)['records'] 
-            results = pd.DataFrame.from_dict(results)
-            results.drop('attributes', axis=1, inplace=True)
+                fmt_where = df_to_update[conflict_on].tolist()
+                fmt_where = ','.join([f"'{i}'" for i in fmt_where])
 
-            update_mapping = results.set_index(conflict_on)['Id']
+                query = f'SELECT Id, {conflict_on} FROM {tablename} WHERE {conflict_on} IN ({fmt_where})' 
 
-            df_to_update['Id'] = df_to_update[conflict_on].map(update_mapping)
-            df_to_update.drop('sf_status', axis=1, inplace=True)
+                results = self.sf.query_all(query, include_deleted=True, timeout=None)['records'] 
+                results = pd.DataFrame.from_dict(results)
+                results.drop('attributes', axis=1, inplace=True)
 
-            df_to_update.dropna(subset=['Id'], inplace=True)
+                update_mapping = results.set_index(conflict_on)['Id']
 
-            update_data = df_to_update.to_dict(orient='records')
-            update_results = bulk_object.update(data=update_data, batch_size=batch_size)
+                df_to_update['Id'] = df_to_update[conflict_on].map(update_mapping)
+                df_to_update.drop('sf_status', axis=1, inplace=True)
 
-            update_successes = 0
+                df_to_update.dropna(subset=['Id'], inplace=True)
 
-            for r in update_results:
-                if r['success'] == True:
-                    update_successes += 1
-                    response_payload['failures'] -= 1
+                update_data = df_to_update.to_dict(orient='records')
+                update_results = bulk_object.update(data=update_data, batch_size=batch_size)
 
-            response_payload['updated'] = update_successes
+                update_successes = 0
 
-            if return_response:
-                response_payload['update_result'] = update_results
+                for r in update_results:
+                    if r['success'] == True:
+                        update_successes += 1
+                        response_payload['failures'] -= 1
+
+                response_payload['updated'] = update_successes
+
+                if return_response:
+                    response_payload['update_result'] = update_results
+
+            else:
+                print('No records to update.')
 
         return response_payload 
 
