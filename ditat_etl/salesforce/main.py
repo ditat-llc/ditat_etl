@@ -20,12 +20,12 @@ class SalesforceObj():
     TYPES_MAPPING = {
         'string': str,
         'reference': str,
-        # 'datetime': datetime,
-        'datetime': 'datetime64',
+        'datetime': 'datetime',
+        # 'datetime': 'datetime64',
         'picklist': list,
         'boolean': bool,
-        # 'date': date,
-        'date': 'datetime64',
+        'date': 'date',
+        # 'date': 'datetime64',
         'double': float,
         'phone': str,
         'url': str,
@@ -185,10 +185,14 @@ class SalesforceObj():
         mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
 
         for k, v in mapping.items():
-            df[k] = df[k].astype(v, errors='ignore')
+            if v == "date":
+                df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
 
-            if v == 'datetime64':
-                df[k] = df[k].dt.strftime('%Y-%m-%dT00:00:00.000Z')
+            elif v == 'datetime':
+                df[k] = df[k].astype('datetime64').dt.strftime('%Y-%m-%dT00:00:00.000Z')
+
+            else:
+                df[k] = df[k].astype(v, errors='ignore')
 
         df = df.where(pd.notnull(df), None)
         df.fillna(0, inplace=True) # Temp, it has to be None-> NULL
