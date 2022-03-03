@@ -184,6 +184,8 @@ class SalesforceObj():
         mapping = info.set_index('name')['python_type'].to_dict()
         mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
 
+        df = df[[col for col in df.columns if col in mapping.keys()]]
+
         for k, v in mapping.items():
             if v == "date":
                 df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
@@ -194,8 +196,10 @@ class SalesforceObj():
             else:
                 df[k] = df[k].astype(v, errors='ignore')
 
+            if v in [int, float]:
+                df[k] = df[k].fillna(0, inplace=True)
+
         df = df.where(pd.notnull(df), None)
-        df.fillna(0, inplace=True) # Temp, it has to be None-> NULL
         return df
         
     def get_table_cols(
@@ -506,29 +510,34 @@ class SalesforceObj():
 
                 results = self.sf.query_all(query, include_deleted=True, timeout=None)['records'] 
                 results = pd.DataFrame.from_dict(results)
-                results.drop('attributes', axis=1, inplace=True)
 
-                update_mapping = results.set_index(conflict_on)['Id']
+                if results.shape[0] > 0:
+                    # review, this sometimes they have errors and they are not created
 
-                df_to_update['Id'] = df_to_update[conflict_on].map(update_mapping)
-                df_to_update.drop('sf_status', axis=1, inplace=True)
+                    if 'attributes' in results.columns:
+                        results.drop('attributes', axis=1, inplace=True)
 
-                df_to_update.dropna(subset=['Id'], inplace=True)
+                    update_mapping = results.set_index(conflict_on)['Id']
 
-                update_data = df_to_update.to_dict(orient='records')
-                update_results = bulk_object.update(data=update_data, batch_size=batch_size)
+                    df_to_update['Id'] = df_to_update[conflict_on].map(update_mapping)
+                    df_to_update.drop('sf_status', axis=1, inplace=True)
 
-                update_successes = 0
+                    df_to_update.dropna(subset=['Id'], inplace=True)
 
-                for r in update_results:
-                    if r['success'] == True:
-                        update_successes += 1
-                        response_payload['failures'] -= 1
+                    update_data = df_to_update.to_dict(orient='records')
+                    update_results = bulk_object.update(data=update_data, batch_size=batch_size)
 
-                response_payload['updated'] = update_successes
+                    update_successes = 0
 
-                if return_response:
-                    response_payload['update_result'] = update_results
+                    for r in update_results:
+                        if r['success'] == True:
+                            update_successes += 1
+                            response_payload['failures'] -= 1
+
+                    response_payload['updated'] = update_successes
+
+                    if return_response:
+                        response_payload['update_result'] = update_results
 
             else:
                 print('No records to update.')
