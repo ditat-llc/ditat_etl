@@ -152,7 +152,7 @@ class Matcher:
             match_type_excluded=match_type_excluded,
             match_count_th=match_count_th or 3,
         )
-        ### EXPERIMENTAL PART
+
         results = self.results.copy()
 
         if results.shape[0] == 0:
@@ -209,7 +209,6 @@ class Matcher:
         print(f'Original dataframe after deduping: {results.shape[0]}')
 
         return results
-        ###
     
     @staticmethod
     def clean_field(x):

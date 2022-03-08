@@ -5,8 +5,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 import requests
 
-from ..utils.time_functions import time_it
-
+from ..time import TimeIt
 
 filedir = os.path.abspath(os.path.dirname(__file__))
 ignored_domains_path = os.path.join(filedir, 'domains_ignored.txt')
@@ -43,21 +42,18 @@ def extract_domain(
     return result
 
 
-@time_it()
+
+@TimeIt
 def eval_url(
     url: str or list,
     max_workers: int=10000,
     timeout=10,
 ):
-    '''
-        This function can later be moved to class Url()
-    '''
     url  = [url] if isinstance(url, str) else url
 
     total = len(url) 
     current = 1
 
-    # @time_it()
     def f(url):
         if not url:
             return None

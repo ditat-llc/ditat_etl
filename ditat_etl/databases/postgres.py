@@ -1,22 +1,20 @@
 import json
-import time
 from functools import wraps
 from ast import literal_eval
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
-import numpy as np
 
-from ..utils import time_it
+from ..time import TimeIt
 
 
 class Postgres:
     TYPES_MAPPING = {
         'text': str,
         'bigint': int,
-        'double precision': float, #float,
-        'timestamp without time zone': 'datetime64', #check
+        'double precision': float,
+        'timestamp without time zone': 'datetime64',
         'timestamp with time zone': 'datetime64',
         'integer': int,
         'character varying': str,
@@ -29,15 +27,12 @@ class Postgres:
         'ARRAY': list
     }
     SF_TO_POSTGRES_TYPES = {
-        # 'anytype': 'text',
         'anytype': 'varchar',
-        # 'base64': 'text',
         'base64': 'varchar',
         'boolean': 'boolean',
         'combobox': 'varchar',
         'currency': 'numeric',
         'datacategorygroupreference': 'varchar',
-        # 'date': 'date',
         'date': 'timestamp',
         'datetime': 'timestamp',
         'double': 'numeric',
@@ -69,10 +64,11 @@ class Postgres:
                 "port": "xxxx"
             }
 
-        Note:
-            For each query, we create and destroy the connection.
-            This is due to the innability of prefect to pickle the psycopg2 instance
-            and self is passed from task to task.
+            keep_connection_alive (bool, default):
+                Persist the connection as an attribute of the class or create
+                and close the connection with each call. Similar to a context
+                manager.
+
         '''
         self.config = config
         self._schema = 'public'
@@ -111,6 +107,7 @@ class Postgres:
     def schema(self, value):
         self._schema = value
 
+    @TimeIt()
     def query(
         self,
         query_statement: list or str,
@@ -134,28 +131,39 @@ class Postgres:
             - query_statement (str or list): A query or list of queries.
                 Order is important.
             
-            - df (boolean, default=False): results as list of pd.DataFrame
+            - df (boolean, default=False): results as list of pd.DataFrame.
             
             - as_dict (boolean, default=False): If df is False, you have the
-                option of returning the column names in a dict instead of a list
+                option of returning the column names in a dict instead of a list.
+
+            - commit (bool, default=True).
 
             - returning (bool, default=True): Does the query or list of queries return.
                 Only returns the last query. Order is important.
 
-            - mogrify (bool, default=False): Mogrify the query passing a tuple for a single 
+            - mogrify (bool, default=False): Mogrify the query passing a tuple for a single.
+
+            - mogrify_tuple (iterable, default=None): Values to be used when mogrigy is True.
+
+            - verbose (bool, default=True): Print query.
 
         Returns
-            - results (list or pd.DataFrame or dict): Depending on the df parameter and
-                also the parameter .
+            - results (list or pd.DataFrame or dict): Depending on the df
+                parameter and also the parameter.
                 If given more than one query, it will only return the result
                 of the last one. Order of queries is important.
         '''
-        conn = psycopg2.connect(**self.config) if not self.keep_connection_alive else self.conn
+        conn = psycopg2.connect(**self.config) \
+            if not self.keep_connection_alive else self.conn
+
         conn.autocommit = True if commit else False
     
         try:
-            query_statement_lst = query_statement if isinstance(query_statement, list) else [query_statement]
-            mogrify_tuple_list = mogrify_tuple if isinstance(query_statement, list) else [mogrify_tuple]
+            query_statement_lst = query_statement \
+                if isinstance(query_statement, list) else [query_statement]
+                    
+            mogrify_tuple_list = mogrify_tuple \
+                if isinstance(query_statement, list) else [mogrify_tuple]
 
             cursor = conn.cursor(cursor_factory=RealDictCursor) if as_dict else conn.cursor()  
             
@@ -224,6 +232,7 @@ class Postgres:
             result (list): List of column names for tablename
         '''
         query = 'SELECT * FROM information_schema.columns WHERE table_schema = %s AND table_name = %s;'
+
         result = self.query(
             query_statement=query,
             df=True,
@@ -242,7 +251,7 @@ class Postgres:
             - Assuming the schema given. Would have to set schema to a different value if needed.
 
         Returns:
-            result (list): List of column names for tablename
+            - result (list): List of column names for tablename
         '''
         table_info = self.get_table_info(tablename)
         columns = table_info.column_name
@@ -250,7 +259,6 @@ class Postgres:
             columns = columns.sort_values()
         return columns.tolist()
 
-    @time_it()
     @table_exists
     def get_table_data_types(self, tablename, df=False, sql_types=False):
         '''
@@ -264,15 +272,22 @@ class Postgres:
             result (dict)            
         '''
         table_info = self.get_table_info(tablename)
+
         if sql_types is False:
+
             table_info['data_type'] = table_info['data_type'].map(type(self).TYPES_MAPPING) 
+
         result = table_info[['column_name', 'data_type']]
 
         if df is False:
-            result = [value for index, value in result.set_index('column_name').to_dict().items()][0]
+
+            result = [
+                value for index, value in result.set_index('column_name').to_dict().items()
+            ][0]
+
         return result 
 
-    @time_it()
+    @TimeIt()
     def insert_df_to_sql(
         self,
         df: pd.DataFrame,
@@ -287,25 +302,36 @@ class Postgres:
 
         Args:
             - df (pd.DataFrame): Values to be updated.
+
             - tablename (str): Table name to in the db.
+
             - commit (bool, default=True): Commit changes.
-            - conflict_on (str or list, default=None): Primary key(s)
-            - on_columns (list, default=None): Index column(s) for conflict
-                evaluation.
+
+            - conflict_on (str or list, default=None): Primary key(s) or unique
+                indexes.
+
             - do_update_columns(bool or list, default=False):
                 if False: DO NOTHING.
                 if True: updates all the non-index/ constraint columns
                 if list: updates only columns in list.
+
+                ! BEWARE: This overwrites all columns, even if the given values
+                    are null.
+
             - verbose (bool, default=False): Print query.
 
         Returns:
+
             - 'INSERT 0 {N_RECORDS}'
         '''
         df = df.copy()
 
         # Casting correct data types
         table_data_types = self.get_table_data_types(tablename)
-        filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
+
+        filtered_data_types = {
+            k: j for k, j in table_data_types.items() if k in df.columns
+        }
 
         for col in df.columns:
             data_type = filtered_data_types[col]
@@ -317,6 +343,7 @@ class Postgres:
                     pass
 
             elif data_type == dict:
+
                 try:
                     df[col] = df[col].apply(literal_eval).apply(json.dumps)
                 except:
@@ -381,7 +408,7 @@ class Postgres:
         print(result)
         return result
 
-    @time_it()
+    @TimeIt()
     def update_df_to_sql(
         self,
         df: pd.DataFrame,
@@ -403,13 +430,19 @@ class Postgres:
 
         Args:
             - df (pd.DataFrame): Values to be updated.
+
             - tablename (str): Table name to in the db.
+
             - on_columns (str or list): which column(s) to use as the identity
                 for updating the values. Serves as a "primary key".
+
             - insert_new (bool, default=True): Insert values that are not already
                 present in the table according to "on_columns".
+
             - commit (bool, default=True): Commit changes.
+
             - verbose (bool, default=False): Print query.
+
             - overwrite (bool, default=False): If False, values will only be updated if
                 existing evaluate to NULL.
 
@@ -420,7 +453,6 @@ class Postgres:
 
         table_data_types = self.get_table_data_types(tablename)
         # following line used for coalesce and casting
-        # table_raw_data_types = {i: j for i, j in self.get_table_data_types(tablename, sql_types=True).items() if j not in ['ARRAY']}
         table_raw_data_types = {
             i: (j if j not in ['ARRAY'] else 'varchar[]') for i, j in self.get_table_data_types(tablename, sql_types=True).items()
         }
@@ -475,11 +507,15 @@ class Postgres:
 
         query = '''UPDATE {} as target SET {} FROM (VALUES {}) AS df({}) WHERE {};'''.format(
             tablename,
-            # ', '.join([f"{col} = df.{col}" for col in updated_columns]),
-            # ', '.join([f"{col} = COALESCE({initial_source}.{col}, {secondary_source}.{col})" for col in updated_columns]),
-            ', '.join([f"{col} = COALESCE({initial_source}.{col}::{data_type}, {secondary_source}.{col}::{data_type})" for col, data_type in table_raw_data_types.items() if col in updated_columns]),
+
+            ', '.join([f"{col} = COALESCE({initial_source}.{col}::{data_type}, \
+                {secondary_source}.{col}::{data_type})" for col, \
+                data_type in table_raw_data_types.items() if col in updated_columns]),
+
             ', '.join(["%s"] * len(records)),
+
             ', '.join(df.columns.tolist()),
+
             'AND '.join([f"df.{col} = target.{col}" for col in on_columns])
         )
         results = {}
@@ -543,17 +579,21 @@ class Postgres:
         ):
         '''
         Create table in DB from source;
-            Like Salesforce Object.
 
         Args:
             - tablename (str) 
+
             - column_mappings (dict): Dictionary of names and postgres datatypes
+
             - primary_key (str or False): Create an index on a single column
                 ** Does not support multiple-column index. You need to call self.create_table_index()
+
             - if_not_exists(bool, default=True)
-            - commit(bool, default=Truie)
+
+            - commit(bool, default=True)
         '''
         query = 'CREATE TABLE '
+
         if if_not_exists:
             query += 'IF NOT EXISTS '
 
@@ -594,6 +634,7 @@ class Postgres:
         columns = columns if isinstance(columns, list) else [columns]
         
         table_columns = self.get_table_cols(tablename)
+
         if not all(elem in table_columns  for elem in columns):
             raise AssertionError(f"One or more columns provided don't exist in table {tablename}.")
 
@@ -611,5 +652,3 @@ class Postgres:
             commit=True,
             verbose=True
         )
-
-

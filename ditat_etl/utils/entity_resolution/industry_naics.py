@@ -3,11 +3,11 @@ import os
 import spacy
 import pandas as pd
 
-from ...utils.time_functions import time_it
+from ...time import TimeIt
 
 
 class NaicsStandard:
-    @time_it()
+    @TimeIt()
     def __init__(self, english_pipeline: str='en_core_web_lg'):
         self.filedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -79,7 +79,7 @@ class NaicsStandard:
 
         return top_2
 
-    @time_it()
+    @TimeIt()
     def classify(self, text: str or list, n=1, th=None, as_df=True):
         text = [text] if isinstance(text, str) else text
 

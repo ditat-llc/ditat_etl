@@ -42,7 +42,7 @@ class TimeIt:
 
             D) 
                 class Foo:
-                @TimeIt() # Or @TimeIt
+                @TimeIt() # It has to be a callable for classes
                 def m(self):
                     pass
 
@@ -63,6 +63,7 @@ class TimeIt:
         if self.func:
             # the func argument work as the first positional argument
             if func:
+
                 args = [func] + list(args)
 
             result = self.func(*args, **kwargs)
@@ -95,9 +96,3 @@ class TimeIt:
         t = time.time() - self.start
 
         print(f"{self.block_text} takes: {round(t, self.decimals)} sec.")
-
-        
-
-
-
-    

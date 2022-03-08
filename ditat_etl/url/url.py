@@ -1,7 +1,6 @@
 import os
 import json
 from typing import Union, Any
-import time
 import random
 import logging
 
@@ -55,7 +54,6 @@ class Url:
         self.max_workers = max_workers
         self.proxies_filepath = proxies_filepath
         self.load_logger(debug_level=debug_level)
-        # self.ip = self.get_local_ip()
 
         if add_proxies:
             self.add_proxies(add_proxies)
@@ -72,13 +70,17 @@ class Url:
                 package.
         '''
         DEBUG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+
         _raise = False
+
         if debug_level not in DEBUG_LEVELS:
             _raise = True           
             debug_level = 'DEBUG'
+
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.addHandler(logging.StreamHandler())
         self.logger.setLevel(getattr(logging, debug_level))
+
         if _raise:
             self.logger.warning(f'Debug level specified not valid. Setting to {debug_level}.')
 
@@ -140,17 +142,24 @@ class Url:
 
         Args:
             - url (str)
+
             - method (str, default='get'): One of HTTP methods.
+
             - proxy (str, default=None): Optional usage of proxy for request.
+
             - timeout (int, default=False): It uses self.default. You can set
                 an integer or None explicity to avoid having a timeout.
+
             - _raise (bool, default=False)
+
             - extra_print(Any, defualt=None): Along with the logger printing
                 of the main response execution, you can add anything and it will
                 be printed after the original message response.url f"{response.url}
                  - STATUS CODE: {response.status_code}".
+
             - expected_status_code (int, default=None): Shortcut to flag responses as
                 successful or failed.
+
             - **kwargs: key, value pairs that are passed to the main requests.method
 
         Returns:
@@ -161,24 +170,31 @@ class Url:
             'proxies': {'http': proxy, 'https': proxy},
             'timeout': self.timeout if timeout is False else timeout
         }
-        # if 'data' in kwargs:
-        #     kwargs['data'] = json.dumps(kwargs['data'])
+
         try:
             f = getattr(requests, method.lower())
             response = f(**f_payload, **kwargs)
             msg = f"{response.url} - STATUS CODE: {response.status_code}"
+
             if extra_print:
                 msg += f" - {extra_print}"
+
             self.logger.info(msg)
+
             if expected_status_code and expected_status_code != response.status_code:
                 return False
+
             return response
+
         except Exception as e:
             if _raise:
                 raise ValueError(e)
+
             err_msg = f"{url} - ERROR"
+
             self.logger.info(err_msg)
             self.logger.debug(e)
+
             return False
 
     def get_local_ip(self, url=None):
@@ -190,11 +206,15 @@ class Url:
             - result (str): If successful, returning the local ip.
         '''
         url  = url or Url.IP_URL
+
         resp = self._request(url=url, expected_status_code=200)
+
         if resp:
             result = resp.text
             self.logger.info(f"Local Ip is {result}")
+
             return result
+
         self.logger.warning('Could not get Local Ip')
 
     def request(
@@ -213,12 +233,17 @@ class Url:
 
         Args:
             - queue (str or list): url(s) to be requested.
+
             - expected_status_code(int, default=200): Any of the Http codes.
+
             - n_times (int, default=1): If type(queue) == str and n_times is provided
                 queue is transformed to: [queue] * n_times.
+
             - max_retries (int, default=None): Proxy retrial. If use_proxy is False,
                 max_retries = 1
+
             - use_proxy (bool, default=True)
+
             - _raise (bool, default=True): Set to False if partial results are ok.
 
         Returns:
@@ -256,19 +281,25 @@ class Url:
                 # Complete futures and add to result_dict
                 for f in as_completed(f_dict):
                     result = f.result()
+
                     if result is not False:
                         result_dict[f_dict[f]] = result
                         del queue[f_dict[f]]
+
                 retries += 1
 
         if _raise and len(result_dict) < queue_len:
             raise ImportError('Could not complete the bulk request!')
+
         elif len(result_dict) < queue_len:
             self.logger.warning('Could not complete the bulk request! Only returning successful.')
+
         # Sort according to initial queue order
         results = [kv[1] for kv in sorted(result_dict.items(), key=lambda x: x[0])]
+
         if queue_len == 1:
             results = results[0]
+
         return results
 
     def eval_proxy(
@@ -288,11 +319,15 @@ class Url:
             - proxy or False (depending on success)
         '''
         url = url or Url.VALIDATION_URL
+
         resp = self._request(url=url, proxy=proxy, expected_status_code=200)
+
         if resp:
             self.logger.info(f'Valid proxy: {proxy}')
             return proxy
+
         self.logger.info(f"Invalid proxy: {proxy}")
+
         return False
 
     def clean_proxies(self):
@@ -301,6 +336,7 @@ class Url:
         '''
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             results = executor.map(self.eval_proxy, self.proxies)
+
         self.proxies = [proxy for proxy in results if proxy]
 
     def add_proxies(
@@ -318,20 +354,25 @@ class Url:
 
         Args:
             - n (int, default=1): Number of proxies to be requested.
+
             - url (str, default=None): It uses Url.PROXY_API as default.
+
             - use_proxy (bool, default=False): Request from local ip or use proxies.
                 This parameter as True hasn't been successful. In testing.
+
             - max_retries (int, default=None): If use_prixy is False, then one,
                 else it uses the internal mechanism to return the max_retries with queries
                 if max_retries is None.
 
         Notes:
             - use_proxy as True has not proved successful.
+
             - Real default for url == Url.PROXY_API. When parsing the json
                 result of the successful response, there is some custom logic,
                 therefore not allowing for a different url.
         '''
         url = url or Url.PROXY_API
+
         proxies = self.request(
             queue=url,
             expected_status_code=200,
@@ -340,8 +381,10 @@ class Url:
             use_proxy=use_proxy,
             max_retries=max_retries
         )
+
         proxies = [resp.json()['curl'] for resp in proxies]
         self.append_proxies(proxies)
+
         return proxies
 
 

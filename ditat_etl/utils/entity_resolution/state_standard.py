@@ -4,7 +4,7 @@ import time
 import spacy
 import pandas as pd
 
-from ...utils.time_functions import time_it
+from ...time import TimeIt
 
 
 '''
@@ -50,7 +50,7 @@ class StateStandard:
 
         return result
 
-    @time_it()
+    @TimeIt()
     def classify(self, text):
         text = [text] if isinstance(text, str) else text
 

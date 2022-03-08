@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import phonenumbers
 
-# from utils import time_it
 
 filedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -15,7 +14,6 @@ class Phone:
 		pass
 
 	@classmethod
-	# @time_it()
 	def format(cls, phone, country):
 	    country = str(country).lower()
 	    if country in cls.CODES.iso_long.values:

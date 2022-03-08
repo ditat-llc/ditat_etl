@@ -7,7 +7,7 @@ import requests
 import pandas as pd
 import boto3
 
-from ... import time_it
+from ....time import TimeIt
 from ....url.functions import extract_domain
 from ....databases import Postgres
 
@@ -75,7 +75,7 @@ class PeopleDataLabs:
             self.s3_params = kwargs
             self.s3_setup(**kwargs)
 
-    @time_it()
+    @TimeIt()
     def s3_setup(
         self,
         bucket_name,
@@ -105,7 +105,6 @@ class PeopleDataLabs:
         }
         self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 
-        # @time_it()
         def _read_file_from_s3(file):
             # print(f'Processing: {file.key}')
             try:

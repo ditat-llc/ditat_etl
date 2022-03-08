@@ -4,11 +4,11 @@ import time
 import spacy
 import pandas as pd
 
-from ...utils.time_functions import time_it
+from ...time import TimeIt
 
 
 class CountryStandard:
-    # @time_it()
+    # @TimeIt()
     def __init__(self, english_pipeline: str='en_core_web_lg', use_nlp=False):
         self.filedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -87,7 +87,7 @@ class CountryStandard:
 
         return result
 
-    @time_it()
+    @TimeIt()
     def classify(self, text):
         text = [text] if isinstance(text, str) else text
 

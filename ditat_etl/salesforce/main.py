@@ -1,7 +1,7 @@
 import os
 import json
 import inspect
-from datetime import timedelta, datetime, date
+from datetime import timedelta, datetime
 import requests
 from concurrent.futures import ThreadPoolExecutor
 
@@ -9,7 +9,8 @@ import pandas as pd
 import numpy as np
 from simple_salesforce import Salesforce
 
-from ..utils.time_functions import time_it
+
+from ..time import TimeIt
 
 
 filedir = os.path.abspath(os.path.dirname(__file__))
@@ -21,11 +22,9 @@ class SalesforceObj():
         'string': str,
         'reference': str,
         'datetime': 'datetime',
-        # 'datetime': 'datetime64',
         'picklist': list,
         'boolean': bool,
         'date': 'date',
-        # 'date': 'datetime64',
         'double': float,
         'phone': str,
         'url': str,
@@ -39,14 +38,13 @@ class SalesforceObj():
         'percent': float
     }
 
-    # @time_it()
     def __init__(
         self,
         config,
         client_id=None,
         client_secret=None,
         ):
-        req_params =  inspect.getargspec(Salesforce)[0] # Evaluate if neccesary, maybe not.
+        req_params =  inspect.getargspec(Salesforce)[0]
         self.config_params = {i: j for i, j in config.items() if i in req_params}
         self.config_params['version'] = '53.0'
 
@@ -60,6 +58,7 @@ class SalesforceObj():
 
     def load_client_credentials(self):
         if not self.client_id or not self.client_secret:
+
             with open(os.path.join(filedir, 'credentials.json'), 'r') as f:
                 file = f.read()
 
@@ -100,8 +99,11 @@ class SalesforceObj():
 
         Args:
             - refresh_token (str)
+
             - client_id (str, default=None)
+
             - client_secret (str, default=None)
+
             - url (str, default='https://login.salesforce.com/services/oauth2/token')
             
         '''
@@ -126,6 +128,7 @@ class SalesforceObj():
         
         Args:
             tablename (str): name of the sobject.
+
             verbose (bool, default=False): print the possible error.
         '''
         try:
@@ -145,6 +148,7 @@ class SalesforceObj():
         except Exception as e:
             if verbose:
                 print(e)
+
             return None
 
     @property
@@ -187,6 +191,7 @@ class SalesforceObj():
         df = df[[col for col in df.columns if col in mapping.keys()]]
 
         for k, v in mapping.items():
+
             if v == "date":
                 df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
 
@@ -200,6 +205,7 @@ class SalesforceObj():
                 df[k] = df[k].fillna(0, inplace=True)
 
         df = df.where(pd.notnull(df), None)
+
         return df
         
     def get_table_cols(
@@ -217,7 +223,7 @@ class SalesforceObj():
         '''
         return self.get_table_info(tablename, columns=['name'])['name'].tolist()
 
-    @time_it()
+    @TimeIt()
     def query(
         self,
         tablename,
@@ -229,9 +235,8 @@ class SalesforceObj():
         date_window=None,
         date_window_variable='LastModifiedDate',
         verbose=False,
-        timeout=None, # This is not working
+        timeout=None,
         max_columns=100, # SF limit on columns
-        # map_types=False
         ):
         '''
         Returns dictionary of the columns requested from the table / SObject specified.
@@ -239,12 +244,19 @@ class SalesforceObj():
 
         Args:
             tablename (str): SObject Resource from self.sf
+            
             columns (str: default=None): Columns names to be queried.
+
             limit (int): CHECK THIS! You have to add a limit.
+
             df(boolean default: False): Output format Dict or pd.DataFrame
+            
             date_from (str, default=None): It has to be in the correct format.
+
             date_to (str, default=None): It has to be in the correct format.
+             
             date_window (int, default=None): How many days to go back
+             
             verbose (bool, default=False): print the query
 
         Returns:
@@ -288,7 +300,10 @@ class SalesforceObj():
             )
             # Using date_window
             if isinstance(date_window, int) and date_window > 0:
-                date_from = (datetime.today() - timedelta(days=date_window)).strftime('%Y-%m-%dT00:00:00.000Z')
+                date_from = (
+                    datetime.today() - timedelta(days=date_window)
+                ).strftime('%Y-%m-%dT00:00:00.000Z')
+
                 query += f" WHERE {date_window_variable} > {date_from}"
 
             # Using date_to AND date_from
@@ -335,7 +350,7 @@ class SalesforceObj():
         return all_results
 
     ############ PARALLEL QUERY ##########
-    @time_it()
+    @TimeIt()
     def query_parallel(
         self,
         tablename,
@@ -372,11 +387,11 @@ class SalesforceObj():
         date_from_fmt = date_from.strftime('%Y-%m-%dT00:00:00.000Z')
 
         date_to = datetime.today() + timedelta(days=1)
-        # date_to_fmt = date_to.strftime('%Y-%m-%dT00:00:00.000Z')
 
         diff = (date_to  - date_from ) / n_chunks
 
         chunks = []
+
         for i in range(n_chunks):
             start = (date_from + diff * i).strftime('%Y-%m-%dT00:00:00.000Z')
             end = (date_from + diff * (i + 1)).strftime('%Y-%m-%dT00:00:00.000Z')
@@ -409,7 +424,6 @@ class SalesforceObj():
         return results
     ######################################
 
-    # @time_it()
     def update(
         self,
         tablename,
@@ -447,11 +461,16 @@ class SalesforceObj():
         '''
         Args:
             - tablename (str): SObject in Salesforce
+
             - dataframe (pd.DataFrame): Data dataframe.
+
             - batch_size (int, default=10_000): Salesforce default.
+
             - update (bool, default=True): Try updating records that have conflict on
                 unique column.
+
             - conflict_on (str, default='Name'): Specify unique column constrain
+
             - return_response (bool, default=False): Include in response_payload
                 the raw response from the Salesforce Api.
 
@@ -512,7 +531,6 @@ class SalesforceObj():
                 results = pd.DataFrame.from_dict(results)
 
                 if results.shape[0] > 0:
-                    # review, this sometimes they have errors and they are not created
 
                     if 'attributes' in results.columns:
                         results.drop('attributes', axis=1, inplace=True)
@@ -543,4 +561,3 @@ class SalesforceObj():
                 print('No records to update.')
 
         return response_payload 
-
