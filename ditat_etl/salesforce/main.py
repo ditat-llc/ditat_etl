@@ -361,7 +361,7 @@ class SalesforceObj():
         date_window_variable='LastModifiedDate',
         verbose=False,
         n_chunks=4 # Unfortunately SF limits this to 10
-        ):
+    ):
         ###### 
         def limit_split(limit, n):
             if limit is None:
