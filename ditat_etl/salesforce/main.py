@@ -22,7 +22,8 @@ class SalesforceObj():
         'string': str,
         'reference': str,
         'datetime': 'datetime',
-        'picklist': list,
+        # 'picklist': list,
+        'picklist': str,
         'boolean': bool,
         'date': 'date',
         'double': float,
@@ -186,7 +187,7 @@ class SalesforceObj():
         info.loc[info['python_type'].isnull(), 'python_type'] = str
 
         mapping = info.set_index('name')['python_type'].to_dict()
-        # mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
+        mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
 
         df = df[[col for col in df.columns if col in mapping.keys()]]
 
