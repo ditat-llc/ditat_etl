@@ -186,13 +186,16 @@ class SalesforceObj():
         info.loc[info['python_type'].isnull(), 'python_type'] = str
 
         mapping = info.set_index('name')['python_type'].to_dict()
-        mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
+        # mapping = {i: j for i, j in mapping.items() if j not in [list, dict]}
 
         df = df[[col for col in df.columns if col in mapping.keys()]]
 
         for k, v in mapping.items():
 
-            if v == "date":
+            if v in [list, dict]:
+                continue
+
+            elif v == "date":
                 df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
 
             elif v == 'datetime':
