@@ -4,6 +4,7 @@ import inspect
 from datetime import timedelta, datetime
 import requests
 from concurrent.futures import ThreadPoolExecutor
+from typing import List
 
 import pandas as pd
 import numpy as np
@@ -179,6 +180,23 @@ class SalesforceObj():
         check_column_casing=True,
         return_as_dict=False
     ):
+        '''
+        Preparation of dataframe to be Salesforce compatible.
+
+        Args:
+            - df (pd.DataFrame)
+
+            - tablename (str): Sobject in Salesforce.
+
+            - check_column_casing (bool, default=True): Manage casing for column
+                names.
+
+            - return_as_dict (bool, default=False): Return as dataframe or dict.
+
+        Returns:
+                - df or data_list 
+
+        '''
         df = df.copy()
         
         info = self.get_table_info(tablename)[['name', 'type']]
@@ -205,11 +223,15 @@ class SalesforceObj():
 
             elif v == "date":
                 df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
-                df[k] = df[k].fillna(-99_999_999)
+
+                if return_as_dict:
+                    df[k] = df[k].fillna(-99_999_999)
 
             elif v == 'datetime':
                 df[k] = df[k].astype('datetime64').dt.strftime('%Y-%m-%dT00:00:00.000Z')
-                df[k] = df[k].fillna(-99_999_999)
+
+                if return_as_dict:
+                    df[k] = df[k].fillna(-99_999_999)
 
             else:
                 df[k] = df[k].astype(v, errors='ignore')
@@ -487,10 +509,10 @@ class SalesforceObj():
         self,
         tablename: str,
         dataframe: pd.DataFrame,
-        batch_size: int=100,
+        batch_size: int=10_000,
         update=True,
         insert=True,
-        conflict_on='Name',
+        conflict_on: str or List[str] ='Name',
         return_response=False,
     ):
         '''
@@ -507,7 +529,10 @@ class SalesforceObj():
 
             - conflict_on (str or list, default='Name'): Specify unique column(s) constrain
                 to separate between update and insert.
+
                 ** These are case sensitive and have to match the Salesforce fields.
+
+                ** Numeric types are not supported for this argument.
 
             - return_response (bool, default=False): Include in response_payload
                 the raw response from the Salesforce Api.
@@ -614,7 +639,7 @@ class SalesforceObj():
 
         existing_df = dataframe[
             ~dataframe['Id'].isnull()
-            ]
+        ]
 
         print('Existing records: ', existing_df.shape[0])
 
@@ -694,153 +719,3 @@ class SalesforceObj():
                 response_payload['insert']['results'] = new_results
 
         return response_payload
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # def insert_df2(
-    #     self,
-    #     tablename: str,
-    #     dataframe: pd.DataFrame,
-    #     batch_size: int=10000,
-    #     update=True,
-    #     conflict_on='Name',
-    #     return_response=False,
-    #     only_update=False
-    # ):
-    #     '''
-    #     Args:
-    #         - tablename (str): SObject in Salesforce
-    #
-    #         - dataframe (pd.DataFrame): Data dataframe.
-    #
-    #         - batch_size (int, default=10_000): Salesforce default.
-    #
-    #         - update (bool, default=True): Try updating records that have conflict on
-    #             unique column.
-    #
-    #         - conflict_on (str, default='Name'): Specify unique column constrain
-    #
-    #         - return_response (bool, default=False): Include in response_payload
-    #             the raw response from the Salesforce Api.
-    #
-    #         - only_update (bool, default=False): Update has to be set to True
-    #
-    #     Returns:
-    #         - response_payload (dict): {"inserted": 2, 'failures': 0, "updated": 3}
-    #             
-    #     '''
-    #     if update is False and only_update is False:
-    #         raise ValueError('You cannot set update and only_update both to False')
-    #
-    #     if not self.check_table_exists(tablename):
-    #         return None
-    #
-    #     # Hot Fix. Refactoring pending for only update logic
-    #     df = self.map_types(
-    #         df=dataframe,
-    #         tablename=tablename,
-    #         return_as_dict=False
-    #     )
-    #
-    #     data = self.map_types(
-    #         df=dataframe,
-    #         tablename=tablename,
-    #         return_as_dict=True
-    #     )
-    #
-    #     bulk_handler = getattr(self.sf, "bulk")
-    #     bulk_object = getattr(bulk_handler,  tablename)
-    #
-    #     if only_update is False:
-    #         result = bulk_object.insert(data=data, batch_size=batch_size)
-    #
-    #         failures = 0
-    #
-    #     else:
-    #         result = []
-    #
-    #         failures = len(data)
-    #
-    #     insert_successes = 0
-    #
-    #     for r in result:
-    #         if r['success'] == True:
-    #             insert_successes += 1
-    #
-    #         elif r['success'] == False:
-    #             failures += 1
-    #
-    #     response_payload = {"inserted": insert_successes, 'failures': failures}
-    #
-    #     if return_response:
-    #         response_payload['result'] = result
-    #
-    #     if update:
-    #
-    #         if only_update is False:
-    #             df['sf_status'] = [i['success'] for i in result] 
-    #             df_to_update = df.loc[df.sf_status == False]
-    #
-    #         else:
-    #             df_to_update = df.copy()
-    #
-    #         if df_to_update.shape[0] > 0:
-    #             df_to_update[conflict_on] = df_to_update[conflict_on].str.replace("'", "\\'")
-    #
-    #             fmt_where = df_to_update[conflict_on].tolist()
-    #             fmt_where = ','.join([f"'{i}'" for i in fmt_where])
-    #
-    #             query = f'SELECT Id, {conflict_on} FROM {tablename} WHERE {conflict_on} IN ({fmt_where})' 
-    #
-    #             results = self.sf.query_all(query, include_deleted=True, timeout=None)['records'] 
-    #             results = pd.DataFrame.from_dict(results)
-    #
-    #             if results.shape[0] > 0:
-    #
-    #                 if 'attributes' in results.columns:
-    #                     results.drop('attributes', axis=1, inplace=True)
-    #
-    #                 update_mapping = results.set_index(conflict_on)['Id']
-    #
-    #                 df_to_update['Id'] = df_to_update[conflict_on].map(update_mapping)
-    #
-    #                 if 'sf_status' in df_to_update.columns:
-    #                     df_to_update.drop('sf_status', axis=1, inplace=True)
-    #
-    #                 df_to_update.dropna(subset=['Id'], inplace=True)
-    #
-    #                 update_data = df_to_update.to_dict(orient='records')
-    #                 update_results = bulk_object.update(data=update_data, batch_size=batch_size)
-    #
-    #                 update_successes = 0
-    #
-    #                 for r in update_results:
-    #                     if r['success'] == True:
-    #                         update_successes += 1
-    #
-    #                         # if only_update is False:
-    #                         response_payload['failures'] -= 1
-    #
-    #                 response_payload['updated'] = update_successes
-    #
-    #                 if return_response:
-    #                     response_payload['update_result'] = update_results
-    #
-    #         else:
-    #             print('No records to update.')
-    #
-    #     return response_payload 
