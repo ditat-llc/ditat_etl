@@ -222,13 +222,13 @@ class SalesforceObj():
                 continue
 
             elif v == "date":
-                df[k] = df[k].astype('datetime64').dt.strftime("%Y-%m-%d")
+                df[k] = df[k].astype('datetime64[ns]').dt.strftime("%Y-%m-%d")
 
                 if return_as_dict:
                     df[k] = df[k].fillna(-99_999_999)
 
             elif v == 'datetime':
-                df[k] = df[k].astype('datetime64').dt.strftime('%Y-%m-%dT00:00:00.000Z')
+                df[k] = df[k].astype('datetime64[ns]').dt.strftime('%Y-%m-%dT00:00:00.000Z')
 
                 if return_as_dict:
                     df[k] = df[k].fillna(-99_999_999)
