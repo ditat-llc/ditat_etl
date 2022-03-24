@@ -56,9 +56,10 @@ class TimeIt:
         self.func = func
         self.decimals = decimals
         self.block_text = text or 'indented block'
-        self.start = time.time()
 
     def __call__(self, func=None, *args, **kwargs):
+        start = time.time()
+
         # When decorating without callable
         if self.func:
             # the func argument work as the first positional argument
@@ -68,7 +69,7 @@ class TimeIt:
 
             result = self.func(*args, **kwargs)
 
-            t = time.time() - self.start
+            t = time.time() - start
 
             print(f"{self.func.__name__} takes: {round(t, self.decimals)} sec.")
 
@@ -81,7 +82,7 @@ class TimeIt:
 
                 result = func(*args, **kwargs)
 
-                t = time.time() - self.start
+                t = time.time() - start
 
                 print(f"{func.__name__} takes: {round(t, self.decimals)} sec.")
 
@@ -90,9 +91,11 @@ class TimeIt:
             return wrapper
     
     def __enter__(self):
-        pass
+        self.start = time.time()
 
     def __exit__(self, *args):
+        start = time.time()
+
         t = time.time() - self.start
 
         print(f"{self.block_text} takes: {round(t, self.decimals)} sec.")
