@@ -484,7 +484,8 @@ class SalesforceObj():
         self,
         tablename,
         record_list,
-        batch_size=10000
+        batch_size=10000,
+        return_result=False
         ):
         '''
         Args:
@@ -503,7 +504,20 @@ class SalesforceObj():
 
         result = bulk_object.update(data=record_list, batch_size=batch_size)
 
-        return result
+        success = 0
+        failure = len(result)
+
+        for r in result:
+            if r.get('success') == True:
+                success += 1
+                failure -= 1
+
+        response = {"sucess": success, "failure": failure}
+
+        if return_result:
+            response['result'] = result
+
+        return response
 
     def insert_df(
         self,
@@ -634,7 +648,8 @@ class SalesforceObj():
             dataframe,
             results_mapping,
             on=conflict_on,
-            how='left'
+            how='left',
+            suffixes=('', '_y')
         )
 
         existing_df = dataframe[
