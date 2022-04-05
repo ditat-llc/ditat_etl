@@ -748,7 +748,8 @@ class SalesforceObj():
 		update: bool=True,
 		insert: bool=True,
 		conflict_on: str or List[str]='Id',
-		return_response: bool=False
+		return_response: bool=False,
+		verbose=False
 	):
 		'''
 		Args:
@@ -771,6 +772,8 @@ class SalesforceObj():
 
 			- return_response (bool, default=False): Include in response_payload
 				the raw response from the Salesforce Api.
+
+			- verbose (bool, default=False): Print query or queries.
 
 		Returns:
 			- response_payload (dict)
@@ -800,6 +803,12 @@ class SalesforceObj():
 		conflict_flag = True if isinstance(conflict_on, list) else False
 
 		if conflict_flag:
+
+			# Check if any of the conflict_on columns are null.
+			if dataframe[conflict_on].isnull().values.any():
+				raise ValueError(
+					'Conflict_on columns cannot be null.'
+				)
 
 			for col in conflict_on:
 				dataframe[col] = dataframe[col].str.replace("'", "\\'")
@@ -831,7 +840,6 @@ class SalesforceObj():
 
 		all_results = []
 
-
 		for chunk in chunks:
 
 			if conflict_flag:
@@ -855,6 +863,10 @@ class SalesforceObj():
 
 			else:
 				query += f" AND {conflict_on} IN ({conflict_on_list}) "
+
+			
+			if verbose:
+				print(query)
 
 			results = self.sf.query_all(
 				query,
