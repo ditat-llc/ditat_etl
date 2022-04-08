@@ -811,7 +811,8 @@ class SalesforceObj():
 				)
 
 			for col in conflict_on:
-				dataframe[col] = dataframe[col].str.replace("'", "\\'")
+				dataframe[col] = dataframe[col].str.replace(
+					"\\", "", regex=True).str.replace("'", "\\'")
 
 			conflict_on_list = dataframe[conflict_on].to_dict(orient='records')
 
@@ -830,8 +831,8 @@ class SalesforceObj():
 
 		else:
 			# For simple conflict on.
-			conflict_on_list = dataframe[conflict_on].str.replace("'", "\\'").tolist()
-
+			conflict_on_list = dataframe[conflict_on].str.replace(
+				"\\", "", regex=True).str.replace("'", "\\'").tolist()
 
 		chunks = type(self).chunker(
 			conflict_on_list,
