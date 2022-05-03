@@ -220,6 +220,19 @@ class Postgres:
 		result.sort()
 		return result
 
+	@property
+	def views(self):
+		query = 'SELECT table_name FROM information_schema.views WHERE table_schema = %s;'
+		result = self.query(
+			query_statement=query,
+			commit=False,
+			mogrify=True,
+			mogrify_tuple=(self.schema,)
+		)
+		result = [i[0] for i in result]
+		result.sort()
+		return result
+
 	@table_exists
 	def get_table_info(self, tablename):
 		'''
