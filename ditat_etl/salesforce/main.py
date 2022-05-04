@@ -203,7 +203,13 @@ class SalesforceObj():
 
 		if check_column_casing:
 			info['lower_name'] = info['name'].str.lower()
-			case_mapping = {i: j for i, j in info.set_index('lower_name')['name'].to_dict().items() if i in df.columns} 
+
+			df.columns = [c.lower() for c in df.columns]
+
+			case_mapping = {
+				i: j for i, j in info.set_index('lower_name')['name'].to_dict().items() \
+				if i in df.columns
+			} 
 			df.rename(columns=case_mapping, inplace=True)
 
 		info = info.loc[info.name.isin(df.columns)]
