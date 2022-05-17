@@ -26,7 +26,7 @@ setup(
 			'utils/entity_resolution/us_states.csv',
 		]
 	},
-	python_requires='>=3.7',
+	python_requires='>=3.8',
 	install_requires=[
 		'pandas',
 		'psycopg2-binary',
