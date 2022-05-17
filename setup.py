@@ -22,7 +22,8 @@ setup(
 			'utils/us_states.csv',
 			'utils/entity_resolution/domains_ignored.txt',
 			'url/domains_ignored.txt',
-            'utils/entity_resolution/naics.csv'
+            'utils/entity_resolution/naics.csv',
+			'utils/entity_resolution/us_states.csv',
 		]
 	},
 	python_requires='>=3.7',
