@@ -8,7 +8,7 @@ from ...time import TimeIt
 
 
 class EntitySearch:
-	def __init__(self, path_or_dataframe, th=0.7):
+	def __init__(self, path_or_dataframe, th=0.2):
 		self.nlp_th = th
 
 		self.load_nlp()
@@ -37,17 +37,11 @@ class EntitySearch:
 			self.nlp = spacy.load(english_pipeline)
 
 	def _npl_search(self, series, values):
-		series = series.copy()
-
-		series = series.apply(type(self)._clean_name)
-
-		values = [type(self)._clean_name(i) for i in values]
-
 		# Exact matches
 		n1 = series.isin(values)
 
-		# Partial matches
-		n2 = series.str.contains('|'.join(values), na=False)
+		# Containing matches
+		n2 = series[~n1].str.contains("|".join(values), na=False)
 
 		# NLP matches
 		values_nlp = [self.nlp(i) for i in values]
@@ -56,9 +50,7 @@ class EntitySearch:
 
 		mapping = {i: self.nlp(i) for i in series_unique}
 
-		nlp_series = series.apply(
-			lambda x: mapping[x] if x in mapping else None
-		)
+		nlp_series = series.apply(lambda x: mapping[x] if x in mapping else None)
 
 		result = nlp_series.apply(
 			lambda x: max([x.similarity(i) for i in values_nlp]) if x else 0
@@ -68,19 +60,6 @@ class EntitySearch:
 		result.loc[n1] = 3
 
 		return result
-
-	@staticmethod
-	def _clean_name(x):
-		if isinstance(x, str):
-			replacements = [ ",", ".", '"', "'", "!", "?", "/", "-", "&", "#", "%",
-				"@", "$", '^', "*", "(", ")", "+", "\\", ">", "<", "'s",
-				"'S"
-			]
-			for r in replacements:
-				x = x.replace(r, " ")
-
-			x = x.lower()
-		return x
 
 	@TimeIt()
 	def run(self, **kwargs):
@@ -154,7 +133,8 @@ class EntitySearch:
 
 		df.sort_values(by='nlp_total', ascending=False, inplace=True)
 
-		return self.df.loc[df.index]
+		return df
+		# return self.df.loc[df.index]
 
 	def distribute(self,
 		payload: dict,
