@@ -298,6 +298,7 @@ class SalesforceObj():
 		date_window=None,
 		date_window_variable='LastModifiedDate',
 		verbose=False,
+		include_deleted=True,
 		timeout=None,
 		max_columns=100, # SF limit on columns
 		):
@@ -319,8 +320,17 @@ class SalesforceObj():
 			date_to (str, default=None): It has to be in the correct format.
 			 
 			date_window (int, default=None): How many days to go back
+
+			date_window_variable (str, default='LastModifiedDate'):
+				Column name to be used for date window
 			 
 			verbose (bool, default=False): print the query
+
+			include_deleted (bool, default=True): Include deleted records
+
+			timeout (int, default=None): Timeout for the query
+
+			max_columns (int, default=100): Maximum number of columns to be queried
 
 		Returns:
 			Output format Dict or pd.DataFrame from query
@@ -385,7 +395,11 @@ class SalesforceObj():
 			if verbose:
 				print(query)
 
-			results = self.sf.query_all(query, include_deleted=True, timeout=timeout)['records'] 
+			results = self.sf.query_all(
+				query,
+				include_deleted=include_deleted,
+				timeout=timeout
+			)['records'] 
 
 			# Only easy way to marge chunks on Id through a DataFrame
 			results = pd.DataFrame.from_dict(results)
@@ -423,6 +437,7 @@ class SalesforceObj():
 		date_window=None,
 		date_window_variable='LastModifiedDate',
 		verbose=False,
+		include_deleted=True,
 		n_chunks=4 # Unfortunately SF limits this to 10
 	):
 		###### 
@@ -444,7 +459,11 @@ class SalesforceObj():
 			date_window_variable = 'CreatedDate'
 
 			min_date_query = f"SELECT MIN({date_window_variable}) FROM {tablename}"
-			date_from_fmt = self.sf.query(min_date_query, include_deleted=True)['records'][0]['expr0']
+
+			date_from_fmt = self.sf.query(
+				min_date_query, include_deleted=include_deleted
+			)['records'][0]['expr0']
+
 			date_from = datetime.strptime(date_from_fmt, '%Y-%m-%dT%H:%M:%S.000+0000')
 
 		date_from_fmt = date_from.strftime('%Y-%m-%dT00:00:00.000Z')
@@ -471,7 +490,8 @@ class SalesforceObj():
 			'date_to': [i[1] for i in chunks],
 			'data_window': [date_window_variable] * len(chunks),
 			'data_window_variable': [date_window_variable] * len(chunks),
-			'verbose': [verbose] * len(chunks)
+			'verbose': [verbose] * len(chunks),
+			'include_deleted': [include_deleted] * len(chunks)
 		}
 
 		with ThreadPoolExecutor() as executor:
