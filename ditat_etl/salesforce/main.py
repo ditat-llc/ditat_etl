@@ -497,6 +497,9 @@ class SalesforceObj():
 		with ThreadPoolExecutor() as executor:
 			results = executor.map(self.query, *payload.values())
 		results = [*results]
+
+		if len([i for i in results if i is not None]) == 0:
+			return pd.DataFrame()
 		
 		if df:
 			results = pd.concat(results).reset_index(drop=True)
