@@ -553,221 +553,6 @@ class SalesforceObj():
 
 		return response
 
-	def insert_df(
-		self,
-		tablename: str,
-		dataframe: pd.DataFrame,
-		batch_size: int=10_000,
-		update=True,
-		insert=True,
-		conflict_on: str or List[str] ='Name',
-		return_response=False,
-	):
-		'''
-		Args:
-			- tablename (str): SObject in Salesforce
-
-			- dataframe (pd.DataFrame): Data dataframe.
-
-			- batch_size (int, default=10_000): Salesforce default.
-
-			- update (bool, default=True): Update records that already exist.
-
-			- insert (bool, default=True): Insert new records.
-
-			- conflict_on (str or list, default='Name'): Specify unique column(s) constrain
-				to separate between update and insert.
-
-				** These are case sensitive and have to match the Salesforce fields.
-
-				** Numeric types are not supported for this argument.
-
-			- return_response (bool, default=False): Include in response_payload
-				the raw response from the Salesforce Api.
-
-		Returns:
-			- response_payload (dict)
-
-		'''
-		if not self.check_table_exists(tablename):
-			return None
-
-		dataframe = dataframe.copy()
-
-		conflict_flag = True if isinstance(conflict_on, list) else False
-
-		# STEP 1: Separate new from existing according to "conflict_on"
-
-		# Query logic for multi-value conlict_on
-		if conflict_flag:
-
-			for col in conflict_on:
-				dataframe[col] = dataframe[col].str.replace("'", "\\'")
-
-			conflict_on_list = dataframe[conflict_on].to_dict(orient='records')
-
-			conflict_on_list_fmt = []
-
-			for i in conflict_on_list:
-				fmt_list = []
-
-				for k, j in i.items():
-				   fmt_list.append(f"{k} = '{j}' ") 
-
-				fmt_list = "(" + "AND ".join(fmt_list) + ")"
-				conflict_on_list_fmt.append(fmt_list)
-
-			conflict_on_list = conflict_on_list_fmt
-
-		else:
-			# For simple conflict on.
-			conflict_on_list = dataframe[conflict_on].str.replace("'", "\\'").tolist()
-
-		# Query as a maximum for "WHERE IN"
-		def chunker(seq, size):
-			return (seq[pos:pos + size] for pos in range(0, len(seq), size))
-
-		chunks = chunker(
-			conflict_on_list,
-			type(self).MAX_QUERY_SIZE
-		)
-
-		all_results = []
-
-		for chunk in chunks:
-
-			if conflict_flag:
-				conflict_on_list = ' OR '.join(chunk)
-
-			else:
-				conflict_on_list = ','.join([f"'{i}'" for i in chunk])
-
-			query = f'''
-				SELECT
-					Id,
-					{', '.join(conflict_on) if conflict_flag else conflict_on}
-				FROM
-					{tablename}
-				WHERE
-					isdeleted = FALSE
-			'''
-
-			if conflict_flag:
-				query += f" AND ({conflict_on_list})"
-
-			else:
-				query += f" AND {conflict_on} IN ({conflict_on_list}) "
-
-			results = self.sf.query_all(
-				query,
-				include_deleted=True,
-				timeout=None
-			)['records']
-
-			results = pd.DataFrame.from_dict(results)
-			
-			all_results.append(results)
-
-		results = pd.concat(all_results, axis=0, ignore_index=True)
-
-		columns = ["Id"] + conflict_on if conflict_flag else ["Id", conflict_on]
-
-		if results.shape[0] > 0:
-			results_mapping =  results[columns]
-
-		else:
-			results_mapping = pd.DataFrame(columns=columns)
-
-		dataframe = pd.merge(
-			dataframe,
-			results_mapping,
-			on=conflict_on,
-			how='left',
-			suffixes=('', '_y')
-		)
-
-		existing_df = dataframe[
-			~dataframe['Id'].isnull()
-		]
-
-		print('Existing records: ', existing_df.shape[0])
-
-		new_df = dataframe[
-			dataframe['Id'].isnull()
-		].drop('Id', axis=1)
-
-		print('New records: ', new_df.shape[0])
-
-		# Settings objects to update and insert
-		bulk_handler = getattr(self.sf, "bulk")
-		bulk_object = getattr(bulk_handler,  tablename)
-
-		response_payload = {}
-
-		# Existing records
-		if update:
-			existing_data = self.map_types(
-				df=existing_df,
-				tablename=tablename,
-				return_as_dict=True
-			)
-
-			existing_results = bulk_object.update(
-				data=existing_data,
-				batch_size=batch_size
-			)
-
-			conflict_on_list = conflict_on if conflict_flag else [conflict_on]
-
-			for i, j in zip(existing_data, existing_results):
-
-				for c in conflict_on_list:
-					j[c] = i[c]
-
-			response_payload['update'] = {'success': 0, 'failure': 0}
-
-			for i in existing_results:
-				if i['success'] == True:
-					response_payload['update']['success'] += 1
-
-				elif i['success'] == False:
-					response_payload['update']['failure'] += 1
-
-			if return_response:
-				response_payload['update']['results'] = existing_results
-
-		# New records
-		if insert:
-			new_data = self.map_types(
-				df=new_df,
-				tablename=tablename,
-				return_as_dict=True
-			)
-			
-			new_results = bulk_object.insert(
-				data=new_data,
-				batch_size=batch_size
-			)
-
-			conflict_on_list = conflict_on if conflict_flag else [conflict_on]
-
-			for i, j in zip(new_data, new_results):
-				for c in conflict_on_list:
-					j[c] = i[c]
-
-			response_payload['insert'] = {'success': 0, 'failure': 0}
-
-			for i in new_results:
-				if i['success'] == True:
-					response_payload['insert']['success'] += 1
-
-				elif i['success'] == False:
-					response_payload['insert']['failure'] += 1
-
-			if return_response:
-				response_payload['insert']['results'] = new_results
-
-		return response_payload
 
 	def upsert_df(
 		self,
@@ -974,7 +759,7 @@ class SalesforceObj():
 					response_payload['update']['failure'] += 1
 
 			if return_response:
-				response_payload['update']['results'] = existing_results
+				response_payload['update']['result'] = existing_results
 
 		# New records
 		if insert:
@@ -1005,7 +790,441 @@ class SalesforceObj():
 					response_payload['insert']['failure'] += 1
 
 			if return_response:
-				response_payload['insert']['results'] = new_results
+				response_payload['insert']['result'] = new_results
 
 		return response_payload
+
+	def upsert_df_beta(
+		self,
+		tablename,
+		dataframe: pd.DataFrame,
+		batch_size: int=10_000,
+		update: bool=True,
+		insert: bool=True,
+		conflict_on: str or List[str]='Id',
+		return_response: bool=False,
+		overwrite: bool=False,
+		overwrite_columns: str or List[str]=None
+	):
+		'''
+		Args:
+			- tablename (str): SObject in Salesforce
+
+			- dataframe (pd.DataFrame): Data dataframe.
+
+			- batch_size (int, default=10_000): Salesforce default.
+
+			- update (bool, default=True): Update records that already exist.
+
+			- insert (bool, default=True): Insert new records.
+
+			- conflict_on (str or list, default='Id'): Specify unique column(s) constrain
+				to separate between update and insert.
+
+				** These are case sensitive and have to match the Salesforce fields.
+
+			- return_response (bool, default=False): Include in response_payload
+				the raw response from the Salesforce Api.
+
+			- overwrite (bool, default=False): Overwrite existing records.
+				If False, only values will be updated where there is currently
+				no value.
+
+			- overwrite_columns (str or list, default=None): Columns to overwrite,
+				if overwrite is True. If None, all columns will be overwritten
+				where a value exists.
+
+		Returns:
+			- response_payload (dict)
+
+		'''
+		### PART 1: Separate new from old records
+		# Create copy of dataframe to avoid modifying original
+		dataframe = dataframe.copy()
+
+		# Settings objects to update and insert
+		bulk_handler = getattr(self.sf, "bulk")
+		bulk_object = getattr(bulk_handler,  tablename)
+
+		# making conflict_on a list, not mandatory but useful of iteration
+		if type(conflict_on) is str:
+			conflict_on = [conflict_on]
+
+		# Making overwrite_columns a list
+		if type(overwrite_columns) is str:
+			overwrite_columns = [overwrite_columns]
+
+		# Using mapping to get SF Columns and proper types
+		dataframe = self.map_types(
+			df=dataframe,
+			tablename=tablename,
+			check_column_casing=True,
+			return_as_dict=False
+		)
+
+		# Workaround regardless of whether id is in dataframe or not
+		columns = list(set(dataframe.columns.tolist() + ['Id']))
+
+		# Getting current data
+		sf_df = self.query_parallel(
+			tablename,
+			columns=columns,
+			limit=None,
+			df=True,
+			date_window=None,
+			date_window_variable='LastModifiedDate',
+			verbose=False,
+			include_deleted=False,
+			n_chunks=5
+		)
+
+		# Middle step to merge on conflict_on and separate new to existing.
+		merged_df = pd.merge(
+			sf_df,
+			dataframe,
+			on=conflict_on,
+			how='right',
+			suffixes=('__current', ''),
+			indicator=True
+		)
+
+		# New df
+		new_df = merged_df[merged_df['_merge'] == 'right_only']
+		new_df = new_df[columns]
+		new_df.drop('Id', axis=1, inplace=True)
+		print('New records: ', new_df.shape[0])
+
+		# Existing df
+		existing_df = merged_df[merged_df['_merge'] == 'both']
+		existing_df.drop('_merge', axis=1, inplace=True)
+		print('Existing records: ', existing_df.shape[0])
+
+		### PART 2: Strategy for updating value and overwrite
+		for column in columns:
+			if column not in conflict_on:
+
+				if not overwrite:
+					existing_df[f"{column}__current"].fillna(
+						existing_df[column],
+						inplace=True
+					)
+
+				elif overwrite and overwrite_columns is None:
+					existing_df[column].fillna(
+						existing_df[f"{column}__current"],
+						inplace=True
+					)
+
+				else:
+					if column in overwrite_columns:
+						existing_df[column].fillna(
+							existing_df[f"{column}__current"],
+							inplace=True
+						)
+						existing_df[f"{column}__current"] = existing_df[column]
+
+		if overwrite and overwrite_columns is None:
+			existing_df = existing_df[columns]
+
+		else:
+			existing_df = existing_df[ 
+				[c for c in existing_df.columns if c.endswith('__current')]
+				+
+				conflict_on
+			]
+			existing_df.columns = [
+				c.replace('__current', '') for c in existing_df.columns
+			]
+
+		### PART 3: Update and insert records
+		response_payload = {}
+
+		if insert:
+
+			new_data = self.map_types(
+				df=new_df,
+				tablename=tablename,
+				return_as_dict=True,
+				check_column_casing=True
+			)
+
+			new_results = bulk_object.insert(
+				data=new_data,
+				batch_size=batch_size
+			)
+
+			for i, j in zip(new_data, new_results):
+				for c in conflict_on:
+					if c not in ['Id', 'id']:
+						j[c] = i[c]
+
+			response_payload['insert'] = {'success': 0, 'failure': 0}
+
+			for i in new_results:
+				if i['success'] == True:
+					response_payload['insert']['success'] += 1
+
+				elif i['success'] == False:
+					response_payload['insert']['failure'] += 1
+
+			if return_response:
+				response_payload['insert']['result'] = new_results
+
+		if update:
+
+			existing_data = self.map_types(
+				df=existing_df,
+				tablename=tablename,
+				return_as_dict=True,
+				check_column_casing=True
+			)
+
+			existing_results = bulk_object.update(
+				data=existing_data,
+				batch_size=batch_size
+			)
+
+			for i, j in zip(existing_data, existing_results):
+
+				for c in conflict_on:
+					if c not in ['Id', 'id']:
+						j[c] = i[c]
+
+			response_payload['update'] = {'success': 0, 'failure': 0}
+
+			for i in existing_results:
+				if i['success'] == True:
+					response_payload['update']['success'] += 1
+
+				elif i['success'] == False:
+					response_payload['update']['failure'] += 1
+
+			if return_response:
+				response_payload['update']['result'] = existing_results
+
+		return response_payload
+
+	# def insert_df(
+	# 	self,
+	# 	tablename: str,
+	# 	dataframe: pd.DataFrame,
+	# 	batch_size: int=10_000,
+	# 	update=True,
+	# 	insert=True,
+	# 	conflict_on: str or List[str] ='Name',
+	# 	return_response=False,
+	# ):
+	# 	'''
+	# 	Args:
+	# 		- tablename (str): SObject in Salesforce
+	#
+	# 		- dataframe (pd.DataFrame): Data dataframe.
+	#
+	# 		- batch_size (int, default=10_000): Salesforce default.
+	#
+	# 		- update (bool, default=True): Update records that already exist.
+	#
+	# 		- insert (bool, default=True): Insert new records.
+	#
+	# 		- conflict_on (str or list, default='Name'): Specify unique column(s) constrain
+	# 			to separate between update and insert.
+	#
+	# 			** These are case sensitive and have to match the Salesforce fields.
+	#
+	# 			** Numeric types are not supported for this argument.
+	#
+	# 		- return_response (bool, default=False): Include in response_payload
+	# 			the raw response from the Salesforce Api.
+	#
+	# 	Returns:
+	# 		- response_payload (dict)
+	#
+	# 	'''
+	# 	if not self.check_table_exists(tablename):
+	# 		return None
+	#
+	# 	dataframe = dataframe.copy()
+	#
+	# 	conflict_flag = True if isinstance(conflict_on, list) else False
+	#
+	# 	# STEP 1: Separate new from existing according to "conflict_on"
+	#
+	# 	# Query logic for multi-value conlict_on
+	# 	if conflict_flag:
+	#
+	# 		for col in conflict_on:
+	# 			dataframe[col] = dataframe[col].str.replace("'", "\\'")
+	#
+	# 		conflict_on_list = dataframe[conflict_on].to_dict(orient='records')
+	#
+	# 		conflict_on_list_fmt = []
+	#
+	# 		for i in conflict_on_list:
+	# 			fmt_list = []
+	#
+	# 			for k, j in i.items():
+	# 			   fmt_list.append(f"{k} = '{j}' ") 
+	#
+	# 			fmt_list = "(" + "AND ".join(fmt_list) + ")"
+	# 			conflict_on_list_fmt.append(fmt_list)
+	#
+	# 		conflict_on_list = conflict_on_list_fmt
+	#
+	# 	else:
+	# 		# For simple conflict on.
+	# 		conflict_on_list = dataframe[conflict_on].str.replace("'", "\\'").tolist()
+	#
+	# 	# Query as a maximum for "WHERE IN"
+	# 	def chunker(seq, size):
+	# 		return (seq[pos:pos + size] for pos in range(0, len(seq), size))
+	#
+	# 	chunks = chunker(
+	# 		conflict_on_list,
+	# 		type(self).MAX_QUERY_SIZE
+	# 	)
+	#
+	# 	all_results = []
+	#
+	# 	for chunk in chunks:
+	#
+	# 		if conflict_flag:
+	# 			conflict_on_list = ' OR '.join(chunk)
+	#
+	# 		else:
+	# 			conflict_on_list = ','.join([f"'{i}'" for i in chunk])
+	#
+	# 		query = f'''
+	# 			SELECT
+	# 				Id,
+	# 				{', '.join(conflict_on) if conflict_flag else conflict_on}
+	# 			FROM
+	# 				{tablename}
+	# 			WHERE
+	# 				isdeleted = FALSE
+	# 		'''
+	#
+	# 		if conflict_flag:
+	# 			query += f" AND ({conflict_on_list})"
+	#
+	# 		else:
+	# 			query += f" AND {conflict_on} IN ({conflict_on_list}) "
+	#
+	# 		results = self.sf.query_all(
+	# 			query,
+	# 			include_deleted=True,
+	# 			timeout=None
+	# 		)['records']
+	#
+	# 		results = pd.DataFrame.from_dict(results)
+	# 		
+	# 		all_results.append(results)
+	#
+	# 	results = pd.concat(all_results, axis=0, ignore_index=True)
+	#
+	# 	columns = ["Id"] + conflict_on if conflict_flag else ["Id", conflict_on]
+	#
+	# 	if results.shape[0] > 0:
+	# 		results_mapping =  results[columns]
+	#
+	# 	else:
+	# 		results_mapping = pd.DataFrame(columns=columns)
+	#
+	# 	dataframe = pd.merge(
+	# 		dataframe,
+	# 		results_mapping,
+	# 		on=conflict_on,
+	# 		how='left',
+	# 		suffixes=('', '_y')
+	# 	)
+	#
+	# 	existing_df = dataframe[
+	# 		~dataframe['Id'].isnull()
+	# 	]
+	#
+	# 	print('Existing records: ', existing_df.shape[0])
+	#
+	# 	new_df = dataframe[
+	# 		dataframe['Id'].isnull()
+	# 	].drop('Id', axis=1)
+	#
+	# 	print('New records: ', new_df.shape[0])
+	#
+	# 	# Settings objects to update and insert
+	# 	bulk_handler = getattr(self.sf, "bulk")
+	# 	bulk_object = getattr(bulk_handler,  tablename)
+	#
+	# 	response_payload = {}
+	#
+	# 	# Existing records
+	# 	if update:
+	# 		existing_data = self.map_types(
+	# 			df=existing_df,
+	# 			tablename=tablename,
+	# 			return_as_dict=True
+	# 		)
+	#
+	# 		existing_results = bulk_object.update(
+	# 			data=existing_data,
+	# 			batch_size=batch_size
+	# 		)
+	#
+	# 		conflict_on_list = conflict_on if conflict_flag else [conflict_on]
+	#
+	# 		for i, j in zip(existing_data, existing_results):
+	#
+	# 			for c in conflict_on_list:
+	# 				j[c] = i[c]
+	#
+	# 		response_payload['update'] = {'success': 0, 'failure': 0}
+	#
+	# 		for i in existing_results:
+	# 			if i['success'] == True:
+	# 				response_payload['update']['success'] += 1
+	#
+	# 			elif i['success'] == False:
+	# 				response_payload['update']['failure'] += 1
+	#
+	# 		if return_response:
+	# 			response_payload['update']['results'] = existing_results
+	#
+	# 	# New records
+	# 	if insert:
+	# 		new_data = self.map_types(
+	# 			df=new_df,
+	# 			tablename=tablename,
+	# 			return_as_dict=True
+	# 		)
+	# 		
+	# 		new_results = bulk_object.insert(
+	# 			data=new_data,
+	# 			batch_size=batch_size
+	# 		)
+	#
+	# 		conflict_on_list = conflict_on if conflict_flag else [conflict_on]
+	#
+	# 		for i, j in zip(new_data, new_results):
+	# 			for c in conflict_on_list:
+	# 				j[c] = i[c]
+	#
+	# 		response_payload['insert'] = {'success': 0, 'failure': 0}
+	#
+	# 		for i in new_results:
+	# 			if i['success'] == True:
+	# 				response_payload['insert']['success'] += 1
+	#
+	# 			elif i['success'] == False:
+	# 				response_payload['insert']['failure'] += 1
+	#
+	# 		if return_response:
+	# 			response_payload['insert']['results'] = new_results
+	#
+	# 	return response_payload
+
+
+
+
+
+
+
+
 
