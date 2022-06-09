@@ -115,10 +115,10 @@ class DataLoader:
 		dataframe: pd.DataFrame,
 		update=True,
 		insert=True,
-		conflict_on=str | List[str],
+		conflict_on=str or List[str],
 		return_response: bool=True,
 		overwrite: bool=False,
-		overwrite_columns: str | List[str]=None,
+		overwrite_columns: str or List[str]=None,
 		verbose: bool=False
 	):
 		resp = self.sf.upsert_df(
@@ -163,9 +163,7 @@ class DataLoader:
 		if not self.loaded_compare_data:
 			self.load_account_compare_data()
 
-		self.Account.dropna(subset=account_conflict_on, inplace=True)
-
-		self.Account = self.Account.iloc[30: 40]
+		self.Account.dropna(subset=[account_conflict_on], inplace=True)
 
 		ac = self.Account.columns
 
