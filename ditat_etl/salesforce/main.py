@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 from simple_salesforce import Salesforce
 
+pd.options.mode.chained_assignment = None
+
 
 from ..time import TimeIt
 
@@ -286,7 +288,7 @@ class SalesforceObj():
 		'''
 		return self.get_table_info(tablename, columns=['name'])['name'].tolist()
 
-	@TimeIt()
+	# @TimeIt()
 	def query(
 		self,
 		tablename,
@@ -381,13 +383,13 @@ class SalesforceObj():
 
 			# Using date_to AND date_from
 			elif date_from and date_to:
-				query += f" WHERE {date_window_variable} > {date_from} AND {date_window_variable} < {date_to}"
+				query += f" WHERE {date_window_variable} > {date_from} AND {date_window_variable} <= {date_to}"
 
 			elif date_from:
 				query += f" WHERE {date_window_variable} > {date_from}"
 
 			elif date_to:
-				query += f" WHERE {date_window_variable} < {date_to}"
+				query += f" WHERE {date_window_variable} <= {date_to}"
 
 			if isinstance(limit, int):
 				query += f' LIMIT {limit}'
@@ -553,8 +555,7 @@ class SalesforceObj():
 
 		return response
 
-
-	def upsert_df(
+	def upsert_df_old(
 		self,
 		tablename,
 		dataframe: pd.DataFrame,
@@ -794,7 +795,7 @@ class SalesforceObj():
 
 		return response_payload
 
-	def upsert_df_beta(
+	def upsert_df(
 		self,
 		tablename,
 		dataframe: pd.DataFrame,
@@ -804,7 +805,8 @@ class SalesforceObj():
 		conflict_on: str or List[str]='Id',
 		return_response: bool=False,
 		overwrite: bool=False,
-		overwrite_columns: str or List[str]=None
+		overwrite_columns: str or List[str]=None,
+		verbose: bool=False
 	):
 		'''
 		Args:
@@ -833,6 +835,9 @@ class SalesforceObj():
 			- overwrite_columns (str or list, default=None): Columns to overwrite,
 				if overwrite is True. If None, all columns will be overwritten
 				where a value exists.
+
+			- verbose (bool, default=False): Compatibility with older version.
+				No use.
 
 		Returns:
 			- response_payload (dict)
@@ -879,19 +884,22 @@ class SalesforceObj():
 		)
 
 		# Middle step to merge on conflict_on and separate new to existing.
+		sf_df.columns = [
+			f"{c}__current" if c not in conflict_on else c for c in sf_df.columns
+		]
+
 		merged_df = pd.merge(
 			sf_df,
 			dataframe,
 			on=conflict_on,
 			how='right',
-			suffixes=('__current', ''),
+			# suffixes=('', ''),
 			indicator=True
 		)
 
 		# New df
 		new_df = merged_df[merged_df['_merge'] == 'right_only']
-		new_df = new_df[columns]
-		new_df.drop('Id', axis=1, inplace=True)
+		new_df = new_df[dataframe.columns.tolist()]
 		print('New records: ', new_df.shape[0])
 
 		# Existing df
@@ -900,8 +908,9 @@ class SalesforceObj():
 		print('Existing records: ', existing_df.shape[0])
 
 		### PART 2: Strategy for updating value and overwrite
+
 		for column in columns:
-			if column not in conflict_on:
+			if column not in set(conflict_on) | {'Id'}:
 
 				if not overwrite:
 					existing_df[f"{column}__current"].fillna(
@@ -955,7 +964,7 @@ class SalesforceObj():
 
 			for i, j in zip(new_data, new_results):
 				for c in conflict_on:
-					if c not in ['Id', 'id']:
+					if c.lower() != 'id':
 						j[c] = i[c]
 
 			response_payload['insert'] = {'success': 0, 'failure': 0}
@@ -987,7 +996,7 @@ class SalesforceObj():
 			for i, j in zip(existing_data, existing_results):
 
 				for c in conflict_on:
-					if c not in ['Id', 'id']:
+					if c.lower() != 'id':
 						j[c] = i[c]
 
 			response_payload['update'] = {'success': 0, 'failure': 0}
