@@ -29,8 +29,7 @@ class DataLoader:
 		name: str='compare',
 		index='Id',
 		domain='Website',
-		address='BillingStreet',
-		phone='Phone',
+		address='BillingStreet', phone='Phone',
 		country='BillingCountry',
 		entity_name='Name'
 	):
@@ -64,6 +63,8 @@ class DataLoader:
 		self.loaded_compare_data = True
 
 		self.compare_index = index
+
+		self.compare_data = data
 
 	def load_data(
 		self,
@@ -119,7 +120,8 @@ class DataLoader:
 		return_response: bool=True,
 		overwrite: bool=False,
 		overwrite_columns: str or List[str]=None,
-		verbose: bool=False
+		verbose: bool=False,
+		update_diff_on: list=None,
 	):
 		resp = self.sf.upsert_df(
 			tablename=tablename,
@@ -129,7 +131,8 @@ class DataLoader:
 			conflict_on=conflict_on,
 			return_response=return_response,
 			overwrite=overwrite,
-			overwrite_columns=overwrite_columns
+			overwrite_columns=overwrite_columns,
+			update_diff_on=update_diff_on,
 		)
 		resp_fmt = {i: j for i, j in resp.items()}
 
@@ -145,6 +148,12 @@ class DataLoader:
 		self,
 		account_conflict_on: str or list='Name',
 		contact_conflict_on: str or list=['FirstName', 'LastName', 'Email'],
+		create_accounts: bool=True,
+		update_accounts: bool=True,
+		create_contacts: bool=True,
+		update_contacts: bool=True,
+		verbose=False,
+		update_only_missing_on: list=None
 	):
 		'''
 		Args:
@@ -188,7 +197,7 @@ class DataLoader:
 				['entity_name', 'address'],
 				['entity_name', 'phone'],
 
-				['entity_name']
+				# ['entity_name']
 			]
 			
 		)
@@ -210,35 +219,42 @@ class DataLoader:
 		print(f'Existing accounts: {len(existing_accounts)}')
 		print(f'New accounts: {len(new_accounts)}')
 
+		# return
+
 		account_conflict_on_fmt = [account_conflict_on] if \
 			type(account_conflict_on) == str else account_conflict_on
 
-		new_account_resp = self.to_sf(
-			tablename='Account',
-			dataframe=new_accounts,
-			update=False,
-			insert=True,
-			conflict_on=account_conflict_on,
-			return_response=True,
-			overwrite=False,
-			overwrite_columns=None,
-			verbose=True
-		)
+		new_accounts_resp = {'insert': {}}
+		if create_accounts:
+			new_accounts_resp = self.to_sf(
+				tablename='Account',
+				dataframe=new_accounts,
+				update=False,
+				insert=True,
+				conflict_on=account_conflict_on,
+				return_response=True,
+				overwrite=False,
+				overwrite_columns=None,
+				verbose=verbose
+			)
 
-		existing_accounts_resp = self.to_sf(
-			tablename='Account',
-			dataframe=existing_accounts,
-			update=True,
-			insert=False,
-			conflict_on=list(set(['Id'] + account_conflict_on_fmt)),
-			return_response=True,
-			overwrite=False,
-			overwrite_columns=None,
-			verbose=True
-		)
+		existing_accounts_resp = {'update': {}}
+		if update_accounts:
+			existing_accounts_resp = self.to_sf(
+				tablename='Account',
+				dataframe=existing_accounts,
+				update=True,
+				insert=False,
+				conflict_on=list(set(['Id'] + account_conflict_on_fmt)),
+				return_response=True,
+				overwrite=False,
+				overwrite_columns=None,
+				verbose=verbose,
+				update_diff_on=update_only_missing_on,
+			)
 
-		accountid_mapping = new_account_resp['insert'].get('result') + \
-			existing_accounts_resp['update'].get('result')
+		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
+			existing_accounts_resp.get('update').get('result', [])
 
 		accountid_mapping = pd.DataFrame(accountid_mapping)
 
@@ -266,13 +282,13 @@ class DataLoader:
 				self.to_sf(
 					tablename='Contact',
 					dataframe=self.Contact,
-					update=True,
-					insert=True,
+					update=update_contacts,
+					insert=create_contacts,
 					conflict_on=contact_conflict_on,
 					return_response=True,
 					overwrite=False,
 					overwrite_columns=None,
-					verbose=True
+					verbose=verbose
 				)
 			else:
 				print('No Contact data to upsert.')

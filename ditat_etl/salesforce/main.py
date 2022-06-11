@@ -806,7 +806,8 @@ class SalesforceObj():
 		return_response: bool=False,
 		overwrite: bool=False,
 		overwrite_columns: str or List[str]=None,
-		verbose: bool=False
+		verbose: bool=False,
+		update_diff_on: List[str]=None,
 	):
 		'''
 		Args:
@@ -838,6 +839,9 @@ class SalesforceObj():
 
 			- verbose (bool, default=False): Compatibility with older version.
 				No use.
+
+			- update_diff_on (list, default=None): Update only where these
+				columns are different from current and new.
 
 		Returns:
 			- response_payload (dict)
@@ -907,10 +911,30 @@ class SalesforceObj():
 		existing_df.drop('_merge', axis=1, inplace=True)
 		print('Existing records: ', existing_df.shape[0])
 
-		### PART 2: Strategy for updating value and overwrite
+		# Only updating where there is a difference on update_diff_on
+		if update_diff_on is not None:
+			equal_df = existing_df.copy()
+			
+			for c in update_diff_on:
+				# equal_df = equal_df[equal_df[c] == equal_df[f"{c}__current"]]
+				equal_df = equal_df.loc[
+					(equal_df[f"{c}__current"].notnull())
+					# | (equal_df[c] == equal_df[f"{c}__current"])
+					# | (equal_df[c].notnull())
+				]
 
-		for column in columns:
-			if column not in set(conflict_on) | {'Id'}:
+			existing_df = existing_df.loc[
+				~existing_df.index.isin(equal_df.index)
+			]
+
+			print('Updatedable records: ', existing_df.shape[0])
+
+		### PART 2: Strategy for updating value and overwrite
+		comparison_columns = [
+			c for c in columns if c not in set(conflict_on) | {'Id'}
+		]
+
+		for column in comparison_columns:
 
 				if not overwrite:
 					existing_df[f"{column}__current"].fillna(
@@ -948,7 +972,7 @@ class SalesforceObj():
 		### PART 3: Update and insert records
 		response_payload = {}
 
-		if insert:
+		if insert and not new_df.empty:
 
 			new_data = self.map_types(
 				df=new_df,
@@ -979,7 +1003,7 @@ class SalesforceObj():
 			if return_response:
 				response_payload['insert']['result'] = new_results
 
-		if update:
+		if update and not existing_df.empty:
 
 			existing_data = self.map_types(
 				df=existing_df,
