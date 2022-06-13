@@ -913,18 +913,18 @@ class SalesforceObj():
 
 		# Only updating where there is a difference on update_diff_on
 		if update_diff_on is not None:
-			equal_df = existing_df.copy()
+			selected_indexes = []
 			
 			for c in update_diff_on:
-				# equal_df = equal_df[equal_df[c] == equal_df[f"{c}__current"]]
-				equal_df = equal_df.loc[
-					(equal_df[f"{c}__current"].notnull())
-					# | (equal_df[c] == equal_df[f"{c}__current"])
-					# | (equal_df[c].notnull())
-				]
+				subselection = existing_df.loc[
+					(existing_df[c] != existing_df[f"{c}__current"])
+					& (existing_df[c].notnull())
+				, :].index.tolist()
+
+				selected_indexes.extend(subselection)
 
 			existing_df = existing_df.loc[
-				~existing_df.index.isin(equal_df.index)
+				existing_df.index.isin(selected_indexes)
 			]
 
 			print('Updatedable records: ', existing_df.shape[0])

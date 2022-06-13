@@ -254,7 +254,7 @@ class DataLoader:
 			)
 
 		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
-			existing_accounts_resp.get('update').get('result', [])
+			existing_accounts_resp.get('update', {}).get('result', [])
 
 		accountid_mapping = pd.DataFrame(accountid_mapping)
 
