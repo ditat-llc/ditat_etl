@@ -146,7 +146,7 @@ class DataLoader:
 
 	def main(
 		self,
-		account_conflict_on: str or list='Name',
+		account_conflict_on: str='Name',
 		contact_conflict_on: str or list=['FirstName', 'LastName', 'Email'],
 		create_accounts: bool=True,
 		update_accounts: bool=True,
@@ -157,7 +157,7 @@ class DataLoader:
 	):
 		'''
 		Args:
-			account_conflict_on (str | List(str), default='Name'): conflict
+			account_conflict_on (str, default='Name'): conflict
 				resolution on Account.
 
 			contact_conflict_on (str | List(str), default=['FirstName', 'LastName', 'Email']):
@@ -196,8 +196,6 @@ class DataLoader:
 				['domain', 'phone'],
 				['entity_name', 'address'],
 				['entity_name', 'phone'],
-
-				# ['entity_name']
 			]
 			
 		)
@@ -219,10 +217,8 @@ class DataLoader:
 		print(f'Existing accounts: {len(existing_accounts)}')
 		print(f'New accounts: {len(new_accounts)}')
 
-		# return
-
-		account_conflict_on_fmt = [account_conflict_on] if \
-			type(account_conflict_on) == str else account_conflict_on
+		# account_conflict_on_fmt = [account_conflict_on] if \
+		# 	type(account_conflict_on) == str else account_conflict_on
 
 		new_accounts_resp = {'insert': {}}
 		if create_accounts:
@@ -245,7 +241,8 @@ class DataLoader:
 				dataframe=existing_accounts,
 				update=True,
 				insert=False,
-				conflict_on=list(set(['Id'] + account_conflict_on_fmt)),
+				# conflict_on=list(set(['Id'] + [account_conflict_on])),
+				conflict_on='Id',
 				return_response=True,
 				overwrite=False,
 				overwrite_columns=None,
@@ -253,12 +250,18 @@ class DataLoader:
 				update_diff_on=update_only_missing_on,
 			)
 
+			for v, result  in zip(
+				existing_accounts[account_conflict_on].values,
+				existing_accounts_resp['update']['result']
+			):
+				result[account_conflict_on] = v
+
 		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
 			existing_accounts_resp.get('update', {}).get('result', [])
 
 		accountid_mapping = pd.DataFrame(accountid_mapping)
 
-		accountid_mapping = accountid_mapping[['id'] +  account_conflict_on_fmt]
+		accountid_mapping = accountid_mapping[['id'] +  [account_conflict_on]]
 		accountid_mapping.dropna(subset=['id'], inplace=True)
 
 		### CONTACT PROCESSING ###
