@@ -936,25 +936,25 @@ class SalesforceObj():
 
 		for column in comparison_columns:
 
-				if not overwrite:
-					existing_df[f"{column}__current"].fillna(
-						existing_df[column],
-						inplace=True
-					)
+			if not overwrite:
+				existing_df[f"{column}__current"].fillna(
+					existing_df[column],
+					inplace=True
+				)
 
-				elif overwrite and overwrite_columns is None:
+			elif overwrite and overwrite_columns is None:
+				existing_df[column].fillna(
+					existing_df[f"{column}__current"],
+					inplace=True
+				)
+
+			else:
+				if column in overwrite_columns:
 					existing_df[column].fillna(
 						existing_df[f"{column}__current"],
 						inplace=True
 					)
-
-				else:
-					if column in overwrite_columns:
-						existing_df[column].fillna(
-							existing_df[f"{column}__current"],
-							inplace=True
-						)
-						existing_df[f"{column}__current"] = existing_df[column]
+					existing_df[f"{column}__current"] = existing_df[column]
 
 		if overwrite and overwrite_columns is None:
 			existing_df = existing_df[columns]

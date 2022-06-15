@@ -269,6 +269,9 @@ class DataLoader:
 		### CONTACT PROCESSING ###
 		if self.set_Contact:
 
+			print(self.Contact.iloc[0])
+			print(accountid_mapping)
+
 			self.Contact = pd.merge(
 				self.Contact,
 				accountid_mapping,
