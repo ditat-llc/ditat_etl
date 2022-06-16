@@ -252,11 +252,13 @@ class DataLoader:
 				update_diff_on=update_only_missing_on,
 			)
 
-			for v, result  in zip(
-				existing_accounts[account_conflict_on].values,
-				existing_accounts_resp['update']['result']
-			):
-				result[account_conflict_on] = v
+			if existing_accounts_resp:
+
+				for v, result  in zip(
+					existing_accounts[account_conflict_on].values,
+					existing_accounts_resp['update']['result']
+				):
+					result[account_conflict_on] = v
 
 		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
 			existing_accounts_resp.get('update', {}).get('result', [])
