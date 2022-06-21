@@ -198,6 +198,8 @@ class DataLoader:
 				['domain', 'phone'],
 				['entity_name', 'address'],
 				['entity_name', 'phone'],
+
+				['entity_name'],
 			]
 			
 		)
@@ -285,6 +287,8 @@ class DataLoader:
 
 				if 'Name' in self.Contact.columns:
 					self.Contact.drop(columns=['Name'], inplace=True, axis=1)
+
+				self.Contact.dropna(subset=contact_conflict_on, inplace=True)
 
 				self.to_sf(
 					tablename='Contact',

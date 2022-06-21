@@ -851,6 +851,7 @@ class SalesforceObj():
 		# Create copy of dataframe to avoid modifying original
 		dataframe = dataframe.copy()
 
+
 		# Settings objects to update and insert
 		bulk_handler = getattr(self.sf, "bulk")
 		bulk_object = getattr(bulk_handler,  tablename)
@@ -858,6 +859,9 @@ class SalesforceObj():
 		# making conflict_on a list, not mandatory but useful of iteration
 		if type(conflict_on) is str:
 			conflict_on = [conflict_on]
+
+		# Droping duplicates
+		dataframe.drop_duplicates(subset=conflict_on, inplace=True)
 
 		# Making overwrite_columns a list
 		if type(overwrite_columns) is str:
@@ -870,6 +874,11 @@ class SalesforceObj():
 			check_column_casing=True,
 			return_as_dict=False
 		)
+
+		# for col in dataframe.columns:
+		# 	if dataframe[col].dtype == 'object':
+		# 		dataframe[col] = dataframe[col].str.replace(
+		# 			"\\", "", regex=True).str.replace("'", "\\'")
 
 		# Workaround regardless of whether id is in dataframe or not
 		columns = list(set(dataframe.columns.tolist() + ['Id']))
