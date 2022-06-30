@@ -119,6 +119,7 @@ class SalesforceObj():
 			'refresh_token': refresh_token
 		}
 		resp = requests.post(url=url, data=payload).json()
+
 		self.access_token = resp['access_token']
 		self.instance_url = resp['instance_url']
 			

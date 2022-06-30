@@ -107,7 +107,7 @@ class Postgres:
 	def schema(self, value):
 		self._schema = value
 
-	@TimeIt()
+	# @TimeIt()
 	def query(
 		self,
 		query_statement: list or str,
@@ -658,7 +658,7 @@ class Postgres:
 		if unique:
 			query += ' UNIQUE'
 
-		query += f' INDEX {index_name} ON {tablename} USING {method}({columns_fmt});'
+		query += f' INDEX IF NOT EXISTS {index_name} ON {tablename} USING {method}({columns_fmt});'
 
 		self.query(
 			query_statement=query,
