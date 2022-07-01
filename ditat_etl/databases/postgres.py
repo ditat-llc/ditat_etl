@@ -529,7 +529,7 @@ class Postgres:
 
 			', '.join(df.columns.tolist()),
 
-			'AND '.join([f"df.{col} = target.{col}" for col in on_columns])
+			' AND '.join([f"df.{col} = target.{col}" for col in on_columns])
 		)
 		results = {}
 
