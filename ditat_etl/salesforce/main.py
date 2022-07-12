@@ -901,6 +901,17 @@ class SalesforceObj():
 			f"{c}__current" if c not in conflict_on else c for c in sf_df.columns
 		]
 
+		# Middle step to strip conlict_on columns for both dataframes
+		for col in conflict_on:
+
+			dataframe[col] = dataframe[col].apply(
+				lambda x: x.strip() if isinstance(x, str) else x
+			)
+
+			sf_df[col] = sf_df[col].apply(
+				lambda x: x.strip() if isinstance(x, str) else x
+			)
+
 		merged_df = pd.merge(
 			sf_df,
 			dataframe,
