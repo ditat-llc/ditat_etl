@@ -49,7 +49,8 @@ class Postgres:
 		'textarea': 'varchar',
 		'time': 'time',
 		'url': 'varchar',
-		'address': 'jsonb'
+		'address': 'jsonb',
+		'location': 'jsonb',
 	}
 
 	def __init__(self, config, keep_connection_alive=False):
