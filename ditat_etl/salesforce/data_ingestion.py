@@ -33,6 +33,7 @@ class DataLoader:
 		country='BillingCountry',
 		entity_name='Name'
 	):
+		print('Starting to load account compare data')
 		# If a dataframe is not provided, we load it from Salesforce.
 		if data is None:
 			data = self.sf.query_parallel(
@@ -170,47 +171,49 @@ class DataLoader:
 		if self.set_Account is False:
 			raise ValueError('Account data has not been loaded')
 
+
 		# Load compare data if not already loaded: Matcher part 1
-		if not self.loaded_compare_data:
+		if not self.loaded_compare_data and account_conflict_on != 'Id':
 			self.load_account_compare_data()
 
 		self.Account.dropna(subset=[account_conflict_on], inplace=True)
 
 		ac = self.Account.columns
 
-		# Matcher part 2
-		self.matcher.set_df(
-			data=self.Account,
-			name='new',
-			index=account_conflict_on,
-			domain='Website' if 'Website' in ac else None,
-			address='BillingStreet' if 'BillingStreet' in ac else None,
-			phone='Phone' if 'Phone' in ac else None,
-			country='BillingCountry' if 'BillingCountry' in ac else None,
-			entity_name='Name' if 'Name' in ac else None
-		)
+		if account_conflict_on != 'Id':
+			# Matcher part 2
+			self.matcher.set_df(
+				data=self.Account,
+				name='new',
+				index=account_conflict_on,
+				domain='Website' if 'Website' in ac else None,
+				address='BillingStreet' if 'BillingStreet' in ac else None,
+				phone='Phone' if 'Phone' in ac else None,
+				country='BillingCountry' if 'BillingCountry' in ac else None,
+				entity_name='Name' if 'Name' in ac else None
+			)
 
-		matches = self.matcher.run(
-			match_type_included = [   
-				['domain'],
-				['domain', 'entity_name'],
-				['domain', 'address'],
-				['domain', 'phone'],
-				['entity_name', 'address'],
-				['entity_name', 'phone'],
+			matches = self.matcher.run(
+				match_type_included = [   
+					['domain'],
+					['domain', 'entity_name'],
+					['domain', 'address'],
+					['domain', 'phone'],
+					['entity_name', 'address'],
+					['entity_name', 'phone'],
 
-				['entity_name'],
+					['entity_name'],
+				]
+				
+			)
+			matches_mapping = matches[[
+				f"{account_conflict_on}_new", f"{self.compare_index}_compare"
+			]].groupby(f"{account_conflict_on}_new").first()[
+				f"{self.compare_index}_compare"
 			]
 			
-		)
-		matches_mapping = matches[[
-			f"{account_conflict_on}_new", f"{self.compare_index}_compare"
-		]].groupby(f"{account_conflict_on}_new").first()[
-			f"{self.compare_index}_compare"
-		]
-		
-		# Obtaining AccountId for existing accounts
-		self.Account['Id'] = self.Account[account_conflict_on].map(matches_mapping)
+			# Obtaining AccountId for existing accounts
+			self.Account['Id'] = self.Account[account_conflict_on].map(matches_mapping)
 
 		existing_accounts = self.Account[self.Account['Id'].notnull()]
 		existing_accounts.drop_duplicates(subset=['Id'], inplace=True)
@@ -225,7 +228,7 @@ class DataLoader:
 		# 	type(account_conflict_on) == str else account_conflict_on
 
 		new_accounts_resp = {'insert': {}}
-		if create_accounts:
+		if create_accounts and len(new_accounts) > 0:
 			new_accounts_resp = self.to_sf(
 				tablename='Account',
 				dataframe=new_accounts,
@@ -239,7 +242,7 @@ class DataLoader:
 			)
 
 		existing_accounts_resp = {'update': {}}
-		if update_accounts:
+		if update_accounts and len(existing_accounts) > 0:
 			existing_accounts_resp = self.to_sf(
 				tablename='Account',
 				dataframe=existing_accounts,
@@ -285,8 +288,11 @@ class DataLoader:
 
 				self.Contact.rename(columns={'id': 'AccountId'}, inplace=True)
 
-				if 'Name' in self.Contact.columns:
-					self.Contact.drop(columns=['Name'], inplace=True, axis=1)
+				# if 'Name' in self.Contact.columns:
+				if account_conflict_on in self.Contact.columns:
+					self.Contact.drop(
+						columns=[account_conflict_on], inplace=True, axis=1
+					)
 
 				self.Contact.dropna(subset=contact_conflict_on, inplace=True)
 
