@@ -29,7 +29,8 @@ class DataLoader:
 		name: str='compare',
 		index='Id',
 		domain='Website',
-		address='BillingStreet', phone='Phone',
+		address='BillingStreet',
+		phone='Phone',
 		country='BillingCountry',
 		entity_name='Name'
 	):
@@ -160,14 +161,27 @@ class DataLoader:
 	):
 		'''
 		Args:
-			account_conflict_on (str, default='Name'): conflict
+			- account_conflict_on (str, default='Name'): conflict
 				resolution on Account.
 
-			contact_conflict_on (str | List(str), default=['FirstName', 'LastName', 'Email']):
+			- contact_conflict_on (str | List(str), default=['FirstName', 'LastName', 'Email']):
 				conflict resolution on Contact.
 
+			- create_accounts (bool, default=True):
+
+			- update_accounts (bool, default=True):
+
+			- create_contacts (bool, default=True):
+
+			- update_contacts (bool, default=True):
+
+			- verbose (bool, default=False): Include result in self.to_sf response. 
+
+			- update_only_missing_on (List(str), default=None):
+				If not None, only update records where there is a 
+				difference in these columns. It saves api calls.
+
 		'''
-		## ACCOUNT PROCESSING ##
 		if self.set_Account is False:
 			raise ValueError('Account data has not been loaded')
 
@@ -224,9 +238,6 @@ class DataLoader:
 		print(f'Existing accounts: {len(existing_accounts)}')
 		print(f'New accounts: {len(new_accounts)}')
 
-		# account_conflict_on_fmt = [account_conflict_on] if \
-		# 	type(account_conflict_on) == str else account_conflict_on
-
 		new_accounts_resp = {'insert': {}}
 		if create_accounts and len(new_accounts) > 0:
 			new_accounts_resp = self.to_sf(
@@ -248,8 +259,8 @@ class DataLoader:
 				dataframe=existing_accounts,
 				update=True,
 				insert=False,
-				# conflict_on=list(set(['Id'] + [account_conflict_on])),
-				conflict_on='Id',
+				conflict_on=list(set(['Id'] + [account_conflict_on])),
+				# conflict_on='Id',
 				return_response=True,
 				overwrite=False,
 				overwrite_columns=None,
@@ -257,21 +268,31 @@ class DataLoader:
 				update_diff_on=update_only_missing_on,
 			)
 
-			if existing_accounts_resp:
+			# if existing_accounts_resp:
+			#
+			# 	print(existing_accounts[account_conflict_on])
+			# 	print(existing_accounts_resp['update']['result'])
+			#
+			# 	for v, result  in zip(
+			# 		existing_accounts[account_conflict_on].values,
+			# 		existing_accounts_resp['update']['result']
+			# 	):
+			# 		result[account_conflict_on] = v
 
-				for v, result  in zip(
-					existing_accounts[account_conflict_on].values,
-					existing_accounts_resp['update']['result']
-				):
-					result[account_conflict_on] = v
 
 		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
 			existing_accounts_resp.get('update', {}).get('result', [])
 
 		accountid_mapping = pd.DataFrame(accountid_mapping)
 
-		accountid_mapping = accountid_mapping[['id'] +  [account_conflict_on]]
-		accountid_mapping.dropna(subset=['id'], inplace=True)
+		if account_conflict_on != 'Id':
+			accountid_mapping = accountid_mapping[['id'] +  [account_conflict_on]]
+			accountid_mapping.dropna(subset=['id'], inplace=True)
+
+		else:
+			accountid_mapping = accountid_mapping[['id']]
+			accountid_mapping.dropna(subset=['id'], inplace=True)
+			accountid_mapping[account_conflict_on] = accountid_mapping['id']
 
 		### CONTACT PROCESSING ###
 		if self.set_Contact:
@@ -283,12 +304,13 @@ class DataLoader:
 				left_on=self.Contact_join_column,
 				right_on=account_conflict_on,
 			)
+
 			if not self.Contact.empty:
+
 				self.Contact.drop(self.Contact_join_column, inplace=True, axis=1)
 
 				self.Contact.rename(columns={'id': 'AccountId'}, inplace=True)
 
-				# if 'Name' in self.Contact.columns:
 				if account_conflict_on in self.Contact.columns:
 					self.Contact.drop(
 						columns=[account_conflict_on], inplace=True, axis=1

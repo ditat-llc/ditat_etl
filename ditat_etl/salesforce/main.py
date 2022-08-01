@@ -468,6 +468,11 @@ class SalesforceObj():
 			)['records'][0]['expr0']
 
 			date_from = datetime.strptime(date_from_fmt, '%Y-%m-%dT%H:%M:%S.000+0000')
+			# if date_from_fmt:
+			# 	date_from = datetime.strptime(date_from_fmt, '%Y-%m-%dT%H:%M:%S.000+0000')
+			#
+			# else:
+			# 	date_from = datetime.strptime("1970-01-01T00:00:00.000+0000", '%Y-%m-%dT%H:%M:%S.000+0000')
 
 		date_from_fmt = date_from.strftime('%Y-%m-%dT00:00:00.000Z')
 
