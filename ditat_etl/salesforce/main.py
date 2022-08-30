@@ -929,12 +929,12 @@ class SalesforceObj():
 		# New df
 		new_df = merged_df[merged_df['_merge'] == 'right_only']
 		new_df = new_df[dataframe.columns.tolist()]
-		print('New records: ', new_df.shape[0])
+		print(f'New records: {new_df.shape[0]}')
 
 		# Existing df
 		existing_df = merged_df[merged_df['_merge'] == 'both']
 		existing_df.drop('_merge', axis=1, inplace=True)
-		print('Existing records: ', existing_df.shape[0])
+		print(f'Existing records: {existing_df.shape[0]}')
 
 		# Only updating where there is a difference on update_diff_on
 		if update_diff_on is not None:

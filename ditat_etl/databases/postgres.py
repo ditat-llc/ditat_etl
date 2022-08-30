@@ -118,7 +118,8 @@ class Postgres:
 		returning: bool=True,
 		mogrify: bool=False,
 		mogrify_tuple: tuple or list=None,
-		verbose=False
+		verbose=False,
+		timeout=1200,
 	):
 		'''
 		Low level method for querying.
@@ -148,14 +149,18 @@ class Postgres:
 
 			- verbose (bool, default=True): Print query.
 
+			- timeout (int, default=600): Timeout in seconds.
+
 		Returns
 			- results (list or pd.DataFrame or dict): Depending on the df
 				parameter and also the parameter.
 				If given more than one query, it will only return the result
 				of the last one. Order of queries is important.
 		'''
-		conn = psycopg2.connect(**self.config) \
-			if not self.keep_connection_alive else self.conn
+		conn = psycopg2.connect(
+			**self.config,
+			# options=f'-c statement_timeout={timeout}000'
+		) if not self.keep_connection_alive else self.conn
 
 		conn.autocommit = True if commit else False
 	
