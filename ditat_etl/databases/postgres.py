@@ -1,4 +1,5 @@
 import json
+import traceback
 from functools import wraps
 from ast import literal_eval
 
@@ -203,7 +204,8 @@ class Postgres:
 			return results
 		
 		except Exception as e:
-			print(e)
+			# print(e)
+			print(traceback.format_exc())
 
 		finally:
 			if self.keep_connection_alive is False:
@@ -669,7 +671,8 @@ class Postgres:
 		self.query(
 			query_statement=query,
 			commit=True,
-			verbose=True
+			verbose=True,
+			returning=False
 		)
 
 	def add_columns(
