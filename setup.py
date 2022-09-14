@@ -36,7 +36,8 @@ setup(
 		'phonenumbers',
         'boto3',
         'simple-salesforce',
-        'spacy'
+        'spacy',
+		'slackclient',
 	]
 
 )
