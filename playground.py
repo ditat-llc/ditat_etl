@@ -4,40 +4,68 @@ Test stuff
 
 
 from ditat_etl.utils.enrichment import PeopleDataLabs
+import pandas as pd
+import numpy as np
 
 pdl = PeopleDataLabs(
-	api_key='cfc0a579cd65fb5d2783cf6fcfc648393bacbd8063213998810b9d25b1b6d7de',
+	api_key='xxx',
 	check_existing_method='s3',
-	aws_access_key_id = 'AKIAVKQ5KEXP6GQDYDR2',
-	aws_secret_access_key = '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',
+	aws_access_key_id = 'xxx',
+	aws_secret_access_key = 'xxx',
 	bucket_name = 'revtron-peopledatalabs',
 )
 
-# p = pdl.enrich_person(
-# 	min_likelihood=5,
-# 	required=None,
-# 	save=True,
-# 	check_existing=True,
-# 	s3_recalculate=True,
-# 	verbose=True,
-# 	# name='Dylan Dempsey',
-# 	email='dylan@ditat.io'
+# df = pd.read_csv('gigpro-acts-no-naics.csv')
+# df.dropna(subset=['website'], inplace=True)
+# df = df.iloc[0: 10]
+# print(df)
 #
-#
+# df.rename(columns={
+# 	'tickersymbol': 'ticker',
+# 	'billingcountry': 'country',
+# 	'billingstreet': 'location',
+# 	}, inplace=True
 # )
-# print(p)
-
-# p = pdl.enrich_company(
+# columns = ['name', 'website', 'phone', 'country', 'location', 'ticker']
+# df = df[columns]
+# print(df)
+#
+# data_list = df.to_dict(orient='records')
+#
+# r = pdl.bulk_enrich_account(
+# 	account_list=data_list,
 # 	min_likelihood=5,
-# 	required=None,
-# 	save=True,
-# 	check_existing=True,
-# 	s3_recalculate=True,
-# 	name='acepta.com'
-#
-#
+# 	required='naics'
 # )
-print(pdl.s3_ae.T)
+# print(r)
+#
+# # p = pdl.enrich_person(
+# # 	min_likelihood=5,
+# # 	required=None,
+# # 	save=True,
+# # 	check_existing=True,
+# # 	s3_recalculate=True,
+# # 	verbose=True,
+# # 	# name='Dylan Dempsey',
+# # 	email='dylan@ditat.io'
+# #
+# #
+# # )
+# # print(p)
+#
+p = pdl.enrich_account(
+	min_likelihood=5,
+	required=None,
+	save=True,
+	check_existing=True,
+	s3_recalculate=True,
+	name='fasdasd',
+	index='asuidnasiduasn'
 
-print(pdl.s3_pe.T.head(60))
 
+)
+print(p)
+# # print(pdl.s3_ae.T)
+# #
+# # print(pdl.s3_pe.T.head(60))
+#

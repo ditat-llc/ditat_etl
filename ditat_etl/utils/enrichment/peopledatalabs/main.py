@@ -1,10 +1,12 @@
 import os
+import inspect
 import json
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
 import pandas as pd
+import numpy as np
 import boto3
 
 from ....time import TimeIt
@@ -126,15 +128,21 @@ class PeopleDataLabs:
 
 		print('Finished: s3_setup')
 
-	def enrich_company(
+	def enrich_account(
 		self,
 		min_likelihood: int=5,
 		required=None,
 		save=True,
 		check_existing=True,
 		s3_recalculate=True,
+		index=None,
 		**kwargs
 	):
+		# Cleaning kwargs
+		kwargs = {k: v for k, v in kwargs.items() if v not in [
+			None, '', 'None', 'none', 'NONE', np.nan
+		]}
+
 		# Checking minimum fields.
 		required_fields = {
 			'name': ['name'],
@@ -152,33 +160,22 @@ class PeopleDataLabs:
 				print('Not a valid domain.')
 				return None
 
-		# Process to check if file company has already been enriched.
-		if check_existing and self.check_existing_method == 'local':
-			existing_files = []
-			existing_filenames =[f"account_enrichment/{i}" for i in os.listdir('account_enrichment')] 
-			for file in existing_filenames:
-				with open(file, 'r') as f:
-					file_data = json.loads(f.read())
-					existing_files.append(file_data)
-
-			for existing_file in existing_files:
-				for required_field in required_fields:
-					if required_field in kwargs:
-
-						if kwargs[required_field] in existing_file[required_field] or \
-						existing_file[required_field] in kwargs[required_field]:
-							print(f"{required_field}: {kwargs[required_field]} already exists in local.")
-							return None
-		
 		# Using self.s3_ae to check existing
-		elif check_existing and self.check_existing_method == 's3':
+		if check_existing and self.check_existing_method == 's3':
 			if hasattr(self, 's3_ae'):
 				for key, value in required_fields.items():
 					if key in kwargs:
 						for v in value:
 							if kwargs[key] in self.s3_ae[v].values:
-								print(f"{key}: {kwargs[key]} already exists in s3.")
-								return None
+								data = self.s3_ae[self.s3_ae[v] == kwargs[key]].to_dict('records')
+
+								response = {
+									'index': index,
+									'pdl_id': data[0]['id'],
+									'source': 's3'
+								
+								}
+								return response
 		#####
 		url = f"{type(self).BASE_URL}/company/enrich"
 
@@ -205,9 +202,56 @@ class PeopleDataLabs:
 				if s3_recalculate:
 					self.s3_setup(**self.s3_params)
 
-		return json_response
+		result = {
+			'index': index,
+			'pdl_id': json_response.get('id'),
+			'source': 'api'
+		}
+		return result
 
-	def search_company(
+	def bulk_enrich_account(
+		self,
+		account_list: list,
+		min_likelihood: int=5,
+		required=None,
+		save=True,
+		check_existing=True,
+		s3_recalculate=True,
+	):
+
+		for payload in account_list:
+			payload.update({
+				'min_likelihood': min_likelihood,
+				'required': required,
+				'save': save,
+				'check_existing': check_existing,
+				's3_recalculate': False
+			})
+
+		results = []
+		for payload in account_list:
+			r = self.enrich_account(**payload)
+			results.append(r)
+
+		# ap = {}
+		#
+		# p = inspect.signature(self.enrich_account)
+		#
+		# for key in payload.keys():
+		# 	ap[key] = [i.get(key) for i in account_list]
+		# print(ap)
+		# return
+		#
+		# with ThreadPoolExecutor(max_workers=min(1000, len(account_list) or 1)) as ex:
+		# 	results = ex.map(self.enrich_account, **ap)
+		#
+		# results = [*results]
+
+		self.s3_setup(**self.s3_params)
+
+		return results
+
+	def search_account(
 		self,
 		required: str=None,
 		strategy='AND',
