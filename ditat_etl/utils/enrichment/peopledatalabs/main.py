@@ -1,5 +1,6 @@
 import os
 import inspect
+from datetime import datetime
 import json
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
@@ -43,6 +44,7 @@ class PeopleDataLabs:
 		api_key: str,
 		check_existing_method: str='s3',
 		db_config=None,
+		client_path=None,
 		**kwargs
 
 	) -> None:
@@ -54,17 +56,55 @@ class PeopleDataLabs:
 		self.api_key = api_key
 		self.check_existing_method = check_existing_method
 		self.db_config = db_config
+		self.client_path = client_path
+
 		self.init(**kwargs)
 
 	def init(self, **kwargs):
-		if self.check_existing_method == 'local': 
-			for dir in type(self).SAVE_DIRS:
-				if not os.path.exists(dir):
-					os.makedirs(dir)
+		# if self.check_existing_method == 'local': 
+		# 	for dir in type(self).SAVE_DIRS:
+		# 		if not os.path.exists(dir):
+		# 			os.makedirs(dir)
 
 		if self.check_existing_method == 's3':
 			self.s3_params = kwargs
 			self.s3_setup(**kwargs)
+			
+	@property
+	def s3_pairs(self):
+		if self.client_path:
+
+			lst = self.bucket.objects.filter(Prefix=f"pairs/{self.client_path}").all()
+			lst = list(lst)
+
+			with ThreadPoolExecutor(max_workers=min(1000, len(lst) or 1)) as ex:
+				results = ex.map(type(self)._read_file_from_s3, lst)
+			dfs = [df for df in results if df is not None]
+
+			df = pd.concat(dfs, ignore_index=True)
+			df.sort_values('source', inplace=True, ascending=False)
+			df.drop_duplicates(subset=['pdl_id'], inplace=True)
+			return df
+
+		return []
+
+	@property
+	def s3_ae_client(self):
+		c = self.s3_ae.copy()
+		c = c[c['id'].isin(self.s3_pairs['pdl_id'])]
+		return c
+	
+	@staticmethod
+	def _read_file_from_s3(file):
+		print(f'Processing: {file.key}')
+		try:
+			fmt_file = file.get()['Body'].read().decode('UTF-8')
+			df = pd.json_normalize(json.loads(fmt_file))
+			# print(f'Finishing: {file.key}')
+			return df
+		except Exception as e:
+			print(e)
+			# print(f"Error: {file.key}")
 
 	@TimeIt()
 	def s3_setup(
@@ -96,17 +136,6 @@ class PeopleDataLabs:
 		}
 		self.s3_folders = {i: j for i, j in self.s3_folders.items() if j}
 
-		def _read_file_from_s3(file):
-			# print(f'Processing: {file.key}')
-			try:
-				fmt_file = file.get()['Body'].read().decode('UTF-8')
-				df = pd.json_normalize(json.loads(fmt_file))
-				# print(f'Finishing: {file.key}')
-				return df
-			except Exception:
-				pass
-				# print(f"Error: {file.key}")
-
 		for key, value in self.s3_folders.items():
 			print(f"Starting: {value} setup")
 
@@ -114,7 +143,7 @@ class PeopleDataLabs:
 			filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
 
 			with ThreadPoolExecutor(max_workers=min(1000, len(filtered_files) or 1)) as ex:
-				results = ex.map(_read_file_from_s3, filtered_files)
+				results = ex.map(type(self)._read_file_from_s3, filtered_files)
 			dfs = [df for df in results if df is not None]
 
 			if dfs:
@@ -136,6 +165,7 @@ class PeopleDataLabs:
 		check_existing=True,
 		s3_recalculate=True,
 		index=None,
+		return_response=True,
 		**kwargs
 	):
 		# Cleaning kwargs
@@ -171,10 +201,14 @@ class PeopleDataLabs:
 
 								response = {
 									'index': index,
-									'pdl_id': data[0]['id'],
+									'pdl_id':data[0]['id'],
 									'source': 's3'
 								
 								}
+
+								if return_response:
+									response['data'] = data[0]
+
 								return response
 		#####
 		url = f"{type(self).BASE_URL}/company/enrich"
@@ -189,11 +223,11 @@ class PeopleDataLabs:
 		json_response = requests.get(url, params=params).json()
 
 		if json_response["status"] == 200:
-			if save and self.check_existing_method == 'local':
-				with open(os.path.join('account_enrichment', f"{json_response['id']}.json"), 'w') as out:
-					out.write(json.dumps(json_response))
+			# if save and self.check_existing_method == 'local':
+			# 	with open(os.path.join('account_enrichment', f"{json_response['id']}.json"), 'w') as out:
+			# 		out.write(json.dumps(json_response))
 
-			elif save and self.check_existing_method == 's3':
+			if save and self.check_existing_method == 's3':
 				fmt_filename = f"{self.s3_folders['s3_ae']}/{json_response['id']}.json"
 				fmt_file = BytesIO(json.dumps(json_response).encode('UTF-8'))
 
@@ -207,6 +241,9 @@ class PeopleDataLabs:
 			'pdl_id': json_response.get('id'),
 			'source': 'api'
 		}
+		if return_response:
+			result['data'] = json_response if json_response['status'] == 200 else None
+
 		return result
 
 	def bulk_enrich_account(
@@ -216,8 +253,11 @@ class PeopleDataLabs:
 		required=None,
 		save=True,
 		check_existing=True,
-		s3_recalculate=True,
+		index_s3_path: str=None,
+		index_field: str=None,
 	):
+
+		index_s3_path = index_s3_path or self.client_path
 
 		for payload in account_list:
 			payload.update({
@@ -225,27 +265,28 @@ class PeopleDataLabs:
 				'required': required,
 				'save': save,
 				'check_existing': check_existing,
-				's3_recalculate': False
+				's3_recalculate': False,
+				'return_response': False,
+				'index': payload.get(index_field)
 			})
 
 		results = []
+
 		for payload in account_list:
+			print('Processing: ', payload['index'])
+
 			r = self.enrich_account(**payload)
 			results.append(r)
 
-		# ap = {}
-		#
-		# p = inspect.signature(self.enrich_account)
-		#
-		# for key in payload.keys():
-		# 	ap[key] = [i.get(key) for i in account_list]
-		# print(ap)
-		# return
-		#
-		# with ThreadPoolExecutor(max_workers=min(1000, len(account_list) or 1)) as ex:
-		# 	results = ex.map(self.enrich_account, **ap)
-		#
-		# results = [*results]
+		if index_s3_path:
+
+			filtered_results = [r for r in results if r['pdl_id'] is not None]
+
+			self.s3_client.upload_fileobj(
+				BytesIO(json.dumps(filtered_results).encode('UTF-8')),
+				self.bucket_name,
+				f"pairs/{index_s3_path}_{datetime.now()}.json",
+			)
 
 		self.s3_setup(**self.s3_params)
 
