@@ -24,6 +24,9 @@ setup(
 			'url/domains_ignored.txt',
             'utils/entity_resolution/naics.csv',
 			'utils/entity_resolution/us_states.csv',
+			'utils/enrichment/peopledatalabs/ae_result_columns.json',
+			'utils/enrichment/peopledatalabs/pe_result_columns.json',
+			'utils/enrichment/peopledatalabs/ps_columns.json'
 		]
 	},
 	python_requires='>=3.8',
