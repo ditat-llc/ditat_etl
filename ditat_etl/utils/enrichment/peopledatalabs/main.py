@@ -96,7 +96,7 @@ class PeopleDataLabs:
 	
 	@staticmethod
 	def _read_file_from_s3(file):
-		print(f'Processing: {file.key}')
+		# print(f'Processing: {file.key}')
 		try:
 			fmt_file = file.get()['Body'].read().decode('UTF-8')
 			df = pd.json_normalize(json.loads(fmt_file))
@@ -256,7 +256,6 @@ class PeopleDataLabs:
 		index_s3_path: str=None,
 		index_field: str=None,
 	):
-
 		index_s3_path = index_s3_path or self.client_path
 
 		for payload in account_list:

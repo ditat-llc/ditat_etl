@@ -157,7 +157,8 @@ class DataLoader:
 		create_contacts: bool=True,
 		update_contacts: bool=True,
 		verbose=False,
-		update_only_missing_on: list=None
+		update_only_missing_on: list=None,
+		account_overwrite_columns: str or list=None,
 	):
 		'''
 		Args:
@@ -262,8 +263,8 @@ class DataLoader:
 				conflict_on=list(set(['Id'] + [account_conflict_on])),
 				# conflict_on='Id',
 				return_response=True,
-				overwrite=False,
-				overwrite_columns=None,
+				overwrite=True if account_overwrite_columns else False,
+				overwrite_columns=account_overwrite_columns,
 				verbose=verbose,
 				update_diff_on=update_only_missing_on,
 			)
