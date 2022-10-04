@@ -102,8 +102,14 @@ class PeopleDataLabs:
 	@property
 	def s3_ae_client(self):
 		c = self.s3_ae.copy()
-		c = c[c['id'].isin(self.s3_pairs['pdl_id'])]
-		return c
+		df = pd.merge(
+			c,
+			self.s3_pairs_static[['index', 'pdl_id']],
+			left_on='id',
+			right_on='pdl_id',
+			how='left'
+		)
+		return df
 
 	@TimeIt()
 	def s3_setup(

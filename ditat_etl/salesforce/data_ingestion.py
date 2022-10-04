@@ -198,7 +198,7 @@ class DataLoader:
 		if account_conflict_on != 'Id':
 			# Matcher part 2
 			self.matcher.set_df(
-				data=self.Account,
+				data=self.Account.drop_duplicates(subset=[account_conflict_on]),
 				name='new',
 				index=account_conflict_on,
 				domain='Website' if 'Website' in ac else None,
@@ -234,6 +234,7 @@ class DataLoader:
 		existing_accounts.drop_duplicates(subset=['Id'], inplace=True)
 
 		new_accounts = self.Account[self.Account['Id'].isnull()]
+		new_accounts.drop_duplicates(subset=[account_conflict_on], inplace=True)
 		new_accounts.drop(columns=['Id'], inplace=True, axis=1)
 
 		print(f'Existing accounts: {len(existing_accounts)}')
@@ -268,18 +269,6 @@ class DataLoader:
 				verbose=verbose,
 				update_diff_on=update_only_missing_on,
 			)
-
-			# if existing_accounts_resp:
-			#
-			# 	print(existing_accounts[account_conflict_on])
-			# 	print(existing_accounts_resp['update']['result'])
-			#
-			# 	for v, result  in zip(
-			# 		existing_accounts[account_conflict_on].values,
-			# 		existing_accounts_resp['update']['result']
-			# 	):
-			# 		result[account_conflict_on] = v
-
 
 		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
 			existing_accounts_resp.get('update', {}).get('result', [])
