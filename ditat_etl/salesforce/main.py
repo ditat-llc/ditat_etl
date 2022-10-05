@@ -75,6 +75,9 @@ class SalesforceObj():
 			except Exception:
 				print('Could not load SF client credentials.')
 
+	def __str__(self):
+		return self.sf.sf_instance
+
 	def login(self):
 		'''
 		This class will eventually only use oauth2 refresh tokens because
