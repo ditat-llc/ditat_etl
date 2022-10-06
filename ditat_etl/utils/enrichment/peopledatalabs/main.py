@@ -248,11 +248,11 @@ class PeopleDataLabs:
 			df.sort_values('source', inplace=True, ascending=False)
 			df.drop_duplicates(subset=['pdl_id'], inplace=True)
 
-			setattr(self, f'{fmt}_static', df.copy())
+			# setattr(self, f'{fmt}_static', df.copy())
 
 			return df
 
-		setattr(self, f'{fmt}_static', None)
+		# setattr(self, f'{fmt}_static', None)
 		return resp
 			
 	@property
@@ -277,8 +277,8 @@ class PeopleDataLabs:
 
 		pairs_name = f'{path}_pairs'
 
-		if path.startswith('a'):
-			pairs_name += '_static'
+		# if path.startswith('a'):
+		# 	pairs_name += '_static'
 
 		df_pairs = getattr(self, pairs_name)
 

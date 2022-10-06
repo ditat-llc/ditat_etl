@@ -984,6 +984,12 @@ class SalesforceObj():
 					)
 					existing_df[f"{column}__current"] = existing_df[column]
 
+				else:
+					existing_df[f"{column}__current"].fillna(
+						existing_df[column],
+						inplace=True
+					)
+
 		if overwrite and overwrite_columns is None:
 			existing_df = existing_df[columns]
 
