@@ -36,6 +36,8 @@ class PeopleDataLabs:
 	with open(os.path.join(filedir, 'ps_result_columns.json'), 'r') as f:
 		PS_RESULT_COLUMNS = json.load(f)
 
+	WAIT_TIME = 0.5 # Depending on the plan with PDL.
+
 	def __init__(
 		self,
 		api_key: str,
@@ -189,7 +191,7 @@ class PeopleDataLabs:
 
 			setattr(self, key, joined_df)
 
-		print('Finished: s3_setup')
+		print('Finished: s3_init')
 
 	def _read_file_from_s3(self, file):
 		try:
@@ -320,6 +322,27 @@ class PeopleDataLabs:
 		return_response=False,
 		**kwargs
 	):
+		'''
+		Args:
+			 - min_likelihood (int, default=5): Minimum likelihood to consider a match
+
+			 - required (list, default=None): List of required fields to consider a match
+
+			 - save (bool, default=True): Save the results to S3
+
+			 - check_existing (bool, default=True): Check if the results already exist in S3
+
+			 - s3_recalculate (bool, default=True): Recalculate the results.
+				
+			 - index (str, default=None): Index to use for self.ae_pairs
+
+			 - return_response (bool, default=False): Return the response from the API
+
+		Returns:
+			
+			- pd.DataFrame: Dataframe with the results
+		'''
+
 		# Cleaning kwargs
 		kwargs = {k: v for k, v in kwargs.items() if v not in [
 			None, '', 'None', 'none', 'NONE', np.nan
@@ -435,16 +458,38 @@ class PeopleDataLabs:
 
 	def bulk_enrich_account(
 		self,
-		account_list: list,
+		account_list: list or pd.DataFrame,
 		min_likelihood: int=5,
 		required=None,
 		save=True,
 		check_existing=True,
-		index_s3_path: str=None,
 		index_field: str=None,
 		return_as_df: bool=True,
 	):
-		index_s3_path = index_s3_path or self.client_path
+		'''
+		Args:
+			
+			- account_list (list or pd.DataFrame): List of accounts to enrich
+
+			- min_likelihood (int, default=5): Minimum likelihood to consider a match
+
+			- required (list, default=None): List of required fields
+
+			- save (bool, default=True): Save the results to S3
+
+			- check_existing (bool, default=True): Check if the account already exists
+
+			- index_field (str, default=None): Field to use for self.ae_pairs
+
+			- return_as_df (bool, default=True): Return the results as a dataframe
+
+		Returns:
+
+			- pd.DataFrame: Dataframe with the results
+		'''
+
+		if isinstance(account_list, pd.DataFrame):
+			account_list = account_list.to_dict('records')
 
 		for payload in account_list:
 			payload.update({
@@ -474,17 +519,17 @@ class PeopleDataLabs:
 
 			i += 1
 
-		if index_s3_path:
+		if self.client_path:
 
 			filtered_results = [r for r in results if r['pdl_id'] is not None]
 
 			self.s3_client.upload_fileobj(
 				BytesIO(json.dumps(filtered_results).encode('UTF-8')),
 				self.bucket_name,
-				f"pairs/{index_s3_path}_{datetime.now()}.json",
+				f"pairs/{self.client_path}_{datetime.now()}.json",
 			)
 
-		self.s3_init(**self.s3_params)
+		self.s3_init()
 
 		if return_as_df:
 			results =  pd.DataFrame(results)
@@ -505,8 +550,38 @@ class PeopleDataLabs:
 		index: str=None,
 		**kwargs
 	):
+		'''
+		Args:
+			
+			- company_name (str): Company name
+
+			- website (str): Company website
+
+			- required (str, default='work_email'): Required field
+
+			- strategy (str, default='AND'): Search strategy
+
+			- check_existing (bool, default=True): Check if the person already exists
+
+			- return_size (int, default=1): Number of results to return
+
+			- save (bool, default=True): Save the results to S3
+
+			- s3_recalculate (bool, default=True): Recalculate the S3 dataframes
+
+			- verbose (bool, default=True): Print the query
+
+			- index (str, default=None): Index to use for self.ps_pairs
+
+			- **kwargs: Additional arguments to pass to the API
+
+		Returns:
+			
+			- dict: Dictionary with the results
+		'''
+
 		# Check valid parameters 
-		for i, j in kwargs.items():
+		for i, _ in kwargs.items():
 			if i not in type(self).PS_RESULT_COLUMNS:
 				raise ValueError(f"{i} not valid. Check PeopleDataLabs.PS_RESULT_COLUMNS")
 
@@ -590,6 +665,8 @@ class PeopleDataLabs:
 					
 					fmt_filename = f"{self.s3_folders['s3_ps']}/{id}.json"
 
+					print(person)
+
 					fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
 
 					self.s3_client.upload_fileobj(
@@ -597,97 +674,116 @@ class PeopleDataLabs:
 						self.bucket_name,
 						fmt_filename
 					)		
+					print(id)
 
 					self.s3_client.upload_fileobj(
 						BytesIO(json.dumps('').encode('UTF-8')),
 						self.bucket_name,
-						f"person_pairs/{self.client_path}__{index}__{id}.json"
+						f"person_search_pairs/{self.client_path}__{index}__{id}.json"
 					)		
 
 			if s3_recalculate:
-				self.s3_init(**self.s3_params)
+				self.s3_init()
 
 		return response
 
-
 	def bulk_search_person(
 		self,
-		account_list: list,
+		account_list: list or pd.DataFrame,
+		required: str='work_email',
 		verbose=False,
 		return_size=1,
 	):
+		'''
+		Args:
+				
+			- account_list (list or pd.DataFrame): List of accounts to search
 
-		"review this"
+			- required (str, default='work_email'): Required field
+
+			- verbose (bool, default=False): Print the query
+
+			- return_size (int, default=1): Number of results to return
+
+		Returns:
+			
+			- dict: Dictionary with the results
+		'''
+		if isinstance(account_list, pd.DataFrame):
+			account_list = account_list.to_dict('records')
+
+		results = []
 
 		for payload in account_list:
+
 			print(f"Processing {payload['company_name']}")
-			payload['s3_recalculate'] = False
-			payload['return_size'] = return_size
-			payload['verbose'] = verbose
+
+			payload.update({
+				'required': required,
+				'verbose': verbose,
+				'return_size': return_size,
+				's3_recalculate': False,
+			})
 
 			resp = self.search_person(**payload)
 
-			s = resp['status']
+			results.append(resp)
 
-			if s == 200:
-				print('FOUND')
+			print(f"Processed | {resp['status']} | {payload['company_name']}")
 
-			elif s == 429:
-				print(f"Too many requests.")
-				time.sleep(1)
+			time.sleep(type(self).WAIT_TIME)
 
-				resp = self.search_person(**payload)
-				continue
+		self.s3_init()
 
-			time.sleep(0.5)
+		return results
 
-	def enrich_person(
-		self,
-		linkedin_url,
-		save=True,
-		s3_recalculate=False,
-		index=None,
-	):
-		'check this'
-
-		url = f"{self.base_url}/person/enrich"
-		
-		params = {
-			"api_key": self.api_key,
-			"min_likelihood": 5,
-			"profile": linkedin_url
-			# "full_name": full_name,
-			# "job_company_name": job_company_name,
-		}
-
-		json_response = requests.get(url, params=params).json()
-		print(json_response)
-
-		if json_response["status"] == 200:
-
-			data = json_response['data']
-
-			id = data['id']
-
-			filename = f"{id}.json"
-
-			if save and self.check_existing is True:
-				
-				fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
-				fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
-
-				self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-
-				self.s3_client.upload_fileobj(
-					BytesIO(json.dumps('').encode('UTF-8')),
-					self.bucket_name,
-					f"person_enriched_pairs/{self.client_path}__{index}__{id}.json"
-				)		
-
-				if s3_recalculate:
-					self.s3_init(**self.s3_params)
-
-			return data
+	# def enrich_person(
+	# 	self,
+	# 	linkedin_url,
+	# 	save=True,
+	# 	s3_recalculate=False,
+	# 	index=None,
+	# ):
+	# 	'check this'
+	#
+	# 	url = f"{self.base_url}/person/enrich"
+	# 	
+	# 	params = {
+	# 		"api_key": self.api_key,
+	# 		"min_likelihood": 5,
+	# 		"profile": linkedin_url
+	# 		# "full_name": full_name,
+	# 		# "job_company_name": job_company_name,
+	# 	}
+	#
+	# 	json_response = requests.get(url, params=params).json()
+	# 	print(json_response)
+	#
+	# 	if json_response["status"] == 200:
+	#
+	# 		data = json_response['data']
+	#
+	# 		id = data['id']
+	#
+	# 		filename = f"{id}.json"
+	#
+	# 		if save and self.check_existing is True:
+	# 			
+	# 			fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
+	# 			fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
+	#
+	# 			self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
+	#
+	# 			self.s3_client.upload_fileobj(
+	# 				BytesIO(json.dumps('').encode('UTF-8')),
+	# 				self.bucket_name,
+	# 				f"person_enriched_pairs/{self.client_path}__{index}__{id}.json"
+	# 			)		
+	#
+	# 			if s3_recalculate:
+	# 				self.s3_init(**self.s3_params)
+	#
+	# 		return data
 
 	# def search_person_old(
 	# 	self,
