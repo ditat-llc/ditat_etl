@@ -248,11 +248,11 @@ class PeopleDataLabs:
 			df.sort_values('source', inplace=True, ascending=False)
 			df.drop_duplicates(subset=['pdl_id'], inplace=True)
 
-			# setattr(self, f'{fmt}_static', df.copy())
+			setattr(self, f'{fmt}_static', df.copy())
 
 			return df
 
-		# setattr(self, f'{fmt}_static', None)
+		setattr(self, f'{fmt}_static', None)
 		return resp
 			
 	@property
@@ -374,13 +374,13 @@ class PeopleDataLabs:
 				return response
 
 		### STEP 2: Check if account exists according to INDEX.
-		if check_existing and self.ae_pairs is not None and \
-			index in self.ae_pairs['index'].values:
+		if check_existing and self.ae_pairs_static is not None and \
+			index in self.ae_pairs_static['index'].values:
 
 			response = {
 				'index': index,
-				'pdl_id': self.ae_pairs[
-					self.ae_pairs['index'] == index
+				'pdl_id': self.ae_pairs_static[
+					self.ae_pairs_static['index'] == index
 				]['pdl_id'].values[0],
 				'source': 's3'
 			}
