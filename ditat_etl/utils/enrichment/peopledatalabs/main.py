@@ -526,7 +526,7 @@ class PeopleDataLabs:
 			self.s3_client.upload_fileobj(
 				BytesIO(json.dumps(filtered_results).encode('UTF-8')),
 				self.bucket_name,
-				f"pairs/{self.client_path}_{datetime.now()}.json",
+				f"account_enrich_pairs/{self.client_path}_{datetime.now()}.json",
 			)
 
 		self.s3_init()
