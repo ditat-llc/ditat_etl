@@ -26,7 +26,8 @@ setup(
 			'utils/entity_resolution/us_states.csv',
 			'utils/enrichment/peopledatalabs/ae_result_columns.json',
 			'utils/enrichment/peopledatalabs/pe_result_columns.json',
-			'utils/enrichment/peopledatalabs/ps_columns.json'
+			'utils/enrichment/peopledatalabs/ps_result_columns.json',
+			'utils/enrichment/peopledatalabs/as_result_columns.json',
 		]
 	},
 	python_requires='>=3.8',
