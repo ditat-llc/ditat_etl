@@ -193,18 +193,28 @@ class PeopleDataLabs:
 
 		print('Finished: s3_init')
 
-	def _read_file_from_s3(self, file):
+	def _read_file_from_s3(self, file, verbose=True):
 		try:
 			fmt_file = file.get()['Body'].read().decode('UTF-8')
 			df = pd.json_normalize(json.loads(fmt_file))
-			print(f'Finishing: {self.i}/{self.n}', end='\r')
-			self.i += 1
+
+			if verbose:
+				print(f'Finishing: {self.i}/{self.n}', end='\r')
+				self.i += 1
+
 			return df
 
 		except Exception as e:
-			print(e)
-			print(f"Error: {file.key}")
+			if verbose:
+				print(e)
+				print(f"error: {file.key}")
+
 			self.i += 1
+
+	# def ae_dataframe(self, value=''):
+	# 	filtered_files = self.bucket.objects.filter(Prefix=f"dataframes/{value}/").all()
+	# 	filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
+		
 
 	### Setting up client's pairs
 	def _pairs(self, path, open_file=False):
