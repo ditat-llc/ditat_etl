@@ -110,7 +110,7 @@ class PeopleDataLabs:
 			reuse=False,
 		)
 
-		# self.ae_pairs
+		self.ae_pairs
 
 	@TimeIt()
 	def s3_init(
@@ -944,124 +944,124 @@ class PeopleDataLabs:
 	#
 	# 	return response
 
-	def enrich_person_old(
-		self,	 
-		min_likelihood: int=2,
-		required=None,
-		save=True,
-		check_existing=True,
-		s3_recalculate=True,
-		verbose=True,
-		**kwargs
-	):
-		# Checking minimum fields.
-		required_fields = {
-			'profile': ['linkedin_url', 'facebook_url', 'twitter_url'],
-			'email': ['email', 'personal_emails', 'emails'],
-			'phone': ['phone']
-		}
-
-		if not any(i in required_fields for i in kwargs):
-			if all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
-				pass
-			else:
-				raise ValueError(f'You need to specify at least one of {required_fields}')
-
-		# Process to check if file company has already been enriched.
-		if check_existing and self.check_existing == 'local':
-			existing_files = []
-			existing_filenames =[f"person_enrichment/{i}" for i in os.listdir('person_enrichment')] 
-			for file in existing_filenames:
-				with open(file, 'r') as f:
-					file_data = json.loads(f.read())
-					existing_files.append(file_data)
-
-			for existing_file in existing_files:
-				if 'email' in kwargs:
-					if required == existing_file['work_email'] or required in existing_file['personal_emails']: # Add emails
-						print(f"Email already exists.")
-						return None
-
-				elif 'profile' in kwargs:
-					for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
-						if required == existing_file[profile]:
-							print(f"Profile already exists.")
-							return None
-
-				elif 'phone' in kwargs:
-					if required == existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
-						print(f"Phone already exists.")
-						return None
-				else:
-					pass
-					# Pending for combo first_name, last_name and company
-
-
-		elif check_existing and self.check_existing is True:
-			if hasattr(self, 's3_pe'):
-				if 'email' in kwargs:
-					d = kwargs['email']
-					if d in self.s3_pe['work_email'].values \
-					or self.s3_pe['personal_emails'].astype(str).str.contains(d).any() \
-					or self.s3_pe['emails'].astype(str).str.contains(d).any():
-						print(f"Email already exists.")
-						return None
-
-				elif 'profile' in kwargs:
-					d = kwargs['profile']
-					for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
-						if d in self.s3_pe[profile].values:
-							print(f"Profile already exists.")
-							return None
-
-				elif 'phone' in kwargs:
-					d = kwargs['phone']
-					if d in self.s3_pe['mobile_phone'].values or self.s3_pe['phone_numbers'].astype(str).str.contains(d).any():
-						print(f"Phone already exists.")
-						return None
-
-				elif all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
-					filtered_df = self.s3_pe.loc[ 
-						(self.s3_pe['first_name'] == kwargs['first_name'].lower())
-						& (self.s3_pe['last_name'] == kwargs['last_name'].lower())
-						& (self.s3_pe['job_company_name'] == kwargs['company'].lower())
-					]
-					if filtered_df.shape[0] > 0:
-						print('first_name, last_name, company already exists.')
-						return None
-
-		url = f"{self.base_url}/person/enrich"
-
-		params = {
-			"api_key": self.api_key,
-			"min_likelihood": min_likelihood,
-			"required": required
-		}
-		params.update(kwargs)
-
-		json_response = requests.get(url, params=params).json()
-
-		if verbose and json_response['status'] != 200:
-			print(json_response)
-
-		if json_response["status"] == 200:
-			data = json_response['data']
-			filename = f"{json_response['data']['id']}.json"
-
-			if save and self.check_existing == 'local':
-				with open(os.path.join('person_enrichment', f"{filename}"), 'w') as out:
-					out.write(json.dumps(data))
-
-			elif save and self.check_existing is True:
-				fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
-				fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
-
-				self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-
-				if s3_recalculate:
-					self.s3_init(**self.s3_params)
-
-			return data
+	# def enrich_person_old(
+	# 	self,	 
+	# 	min_likelihood: int=2,
+	# 	required=None,
+	# 	save=True,
+	# 	check_existing=True,
+	# 	s3_recalculate=True,
+	# 	verbose=True,
+	# 	**kwargs
+	# ):
+	# 	# Checking minimum fields.
+	# 	required_fields = {
+	# 		'profile': ['linkedin_url', 'facebook_url', 'twitter_url'],
+	# 		'email': ['email', 'personal_emails', 'emails'],
+	# 		'phone': ['phone']
+	# 	}
+	#
+	# 	if not any(i in required_fields for i in kwargs):
+	# 		if all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
+	# 			pass
+	# 		else:
+	# 			raise ValueError(f'You need to specify at least one of {required_fields}')
+	#
+	# 	# Process to check if file company has already been enriched.
+	# 	if check_existing and self.check_existing == 'local':
+	# 		existing_files = []
+	# 		existing_filenames =[f"person_enrichment/{i}" for i in os.listdir('person_enrichment')] 
+	# 		for file in existing_filenames:
+	# 			with open(file, 'r') as f:
+	# 				file_data = json.loads(f.read())
+	# 				existing_files.append(file_data)
+	#
+	# 		for existing_file in existing_files:
+	# 			if 'email' in kwargs:
+	# 				if required == existing_file['work_email'] or required in existing_file['personal_emails']: # Add emails
+	# 					print(f"Email already exists.")
+	# 					return None
+	#
+	# 			elif 'profile' in kwargs:
+	# 				for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
+	# 					if required == existing_file[profile]:
+	# 						print(f"Profile already exists.")
+	# 						return None
+	#
+	# 			elif 'phone' in kwargs:
+	# 				if required == existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
+	# 					print(f"Phone already exists.")
+	# 					return None
+	# 			else:
+	# 				pass
+	# 				# Pending for combo first_name, last_name and company
+	#
+	#
+	# 	elif check_existing and self.check_existing is True:
+	# 		if hasattr(self, 's3_pe'):
+	# 			if 'email' in kwargs:
+	# 				d = kwargs['email']
+	# 				if d in self.s3_pe['work_email'].values \
+	# 				or self.s3_pe['personal_emails'].astype(str).str.contains(d).any() \
+	# 				or self.s3_pe['emails'].astype(str).str.contains(d).any():
+	# 					print(f"Email already exists.")
+	# 					return None
+	#
+	# 			elif 'profile' in kwargs:
+	# 				d = kwargs['profile']
+	# 				for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
+	# 					if d in self.s3_pe[profile].values:
+	# 						print(f"Profile already exists.")
+	# 						return None
+	#
+	# 			elif 'phone' in kwargs:
+	# 				d = kwargs['phone']
+	# 				if d in self.s3_pe['mobile_phone'].values or self.s3_pe['phone_numbers'].astype(str).str.contains(d).any():
+	# 					print(f"Phone already exists.")
+	# 					return None
+	#
+	# 			elif all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
+	# 				filtered_df = self.s3_pe.loc[ 
+	# 					(self.s3_pe['first_name'] == kwargs['first_name'].lower())
+	# 					& (self.s3_pe['last_name'] == kwargs['last_name'].lower())
+	# 					& (self.s3_pe['job_company_name'] == kwargs['company'].lower())
+	# 				]
+	# 				if filtered_df.shape[0] > 0:
+	# 					print('first_name, last_name, company already exists.')
+	# 					return None
+	#
+	# 	url = f"{self.base_url}/person/enrich"
+	#
+	# 	params = {
+	# 		"api_key": self.api_key,
+	# 		"min_likelihood": min_likelihood,
+	# 		"required": required
+	# 	}
+	# 	params.update(kwargs)
+	#
+	# 	json_response = requests.get(url, params=params).json()
+	#
+	# 	if verbose and json_response['status'] != 200:
+	# 		print(json_response)
+	#
+	# 	if json_response["status"] == 200:
+	# 		data = json_response['data']
+	# 		filename = f"{json_response['data']['id']}.json"
+	#
+	# 		if save and self.check_existing == 'local':
+	# 			with open(os.path.join('person_enrichment', f"{filename}"), 'w') as out:
+	# 				out.write(json.dumps(data))
+	#
+	# 		elif save and self.check_existing is True:
+	# 			fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
+	# 			fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
+	#
+	# 			self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
+	#
+	# 			if s3_recalculate:
+	# 				self.s3_init(**self.s3_params)
+	#
+	# 		return data
 	#
 	# # def to_db(self, tablename:str, db_config: dict=None, conflict_on: str='domain'):
 	# # 	'''
