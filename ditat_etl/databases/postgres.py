@@ -2,12 +2,16 @@ import json
 import traceback
 from functools import wraps
 from ast import literal_eval
+import warnings
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
 
 from ..time import TimeIt
+
+
+warnings.filterwarnings('ignore')
 
 
 class Postgres:
@@ -83,6 +87,8 @@ class Postgres:
 		'''
 		Only triggered when self.keep_connection_alive == True.
 		'''
+		# config = ' '.join([f"{k}={v}" for k, v in self.config.items()])
+		# self.conn = psycopg2.connect(config)
 		self.conn = psycopg2.connect(**self.config)
 
 	def close_conn(self):
