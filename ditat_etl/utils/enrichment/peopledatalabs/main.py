@@ -2,7 +2,7 @@ import os
 import time
 from datetime import datetime
 import json
-from io import BytesIO
+from io import BytesIO, StringIO
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -52,6 +52,7 @@ class PeopleDataLabs:
 		s3_pe_setup: bool=True,
 		s3_ps_setup: bool=True,
 		s3_as_setup: bool=False,
+		reprocess_dataframes: bool=False,
 	) -> None:
 		'''
 		Args:
@@ -96,6 +97,8 @@ class PeopleDataLabs:
 
 		self.max_workers = max_workers
 
+		self.reprocess_dataframes = reprocess_dataframes
+
 		self.s3_init(
 			bucket_name=s3_bucket_name,
 			aws_access_key_id=aws_access_key_id,
@@ -107,7 +110,7 @@ class PeopleDataLabs:
 			reuse=False,
 		)
 
-		self.ae_pairs
+		# self.ae_pairs
 
 	@TimeIt()
 	def s3_init(
@@ -170,6 +173,27 @@ class PeopleDataLabs:
 			filtered_files = self.bucket.objects.filter(Prefix=f"{value}/").all()
 			filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
 
+			# [SPEEDUP PART 1] Using existing dataframes for speedup
+			if self.reprocess_dataframes:
+				existing_df = pd.DataFrame()
+
+			else:
+				df_files = self.bucket.objects.filter(Prefix=f"dataframes/{value}.csv")
+
+				if len(list(df_files)) == 0:
+					existing_df = pd.DataFrame()
+
+				else:
+					df_file = list(df_files)[0].get()['Body'].read().decode('UTF-8')
+
+					existing_df = pd.read_csv(StringIO(df_file))
+
+					filtered_files = [
+						f for f in filtered_files if f.key.split('/')[-1].replace('.json', '') \
+						not in existing_df['id'].values
+					]
+			###
+
 			self.n = len(filtered_files)
 			self.i = 0
 
@@ -179,7 +203,8 @@ class PeopleDataLabs:
 
 			self.i = 0
 
-			dfs = [df for df in results if df is not None] 
+			# dfs = [df for df in results if df is not None] 
+			dfs = [existing_df] + [df for df in results if df is not None] 
 
 			if dfs:
 				joined_df = pd.concat(dfs, axis=0, ignore_index=True)
@@ -190,6 +215,13 @@ class PeopleDataLabs:
 				)
 
 			setattr(self, key, joined_df)
+
+			# [SPEEDUP PART 2] Saving dataframes for speedup
+			fmt_file = BytesIO(joined_df.to_csv(index=False).encode('UTF-8'))
+			fmt_filename = f"dataframes/{value}.csv"
+			###
+
+			self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
 
 		print('Finished: s3_init')
 
@@ -210,11 +242,6 @@ class PeopleDataLabs:
 				print(f"error: {file.key}")
 
 			self.i += 1
-
-	# def ae_dataframe(self, value=''):
-	# 	filtered_files = self.bucket.objects.filter(Prefix=f"dataframes/{value}/").all()
-	# 	filtered_files = [f for f in filtered_files if f.key != f"{value}/"]
-		
 
 	### Setting up client's pairs
 	def _pairs(self, path, open_file=False):
