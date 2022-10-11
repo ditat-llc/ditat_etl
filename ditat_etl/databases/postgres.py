@@ -381,6 +381,8 @@ class Postgres:
 				# Workaround: Cannot place None with numerical.
 				df[col] = df[col].astype(str)
 				df[col] = df[col].replace({'nan': None})
+				df[col] = df[col].str.replace(',', '')
+				df[col] = df[col].replace({'': None})
 
 				### under evaluation
 				df[col] = df[col].replace({'None': None})
