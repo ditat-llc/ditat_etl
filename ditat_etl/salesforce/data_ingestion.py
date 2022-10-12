@@ -219,7 +219,6 @@ class DataLoader:
 
 					['entity_name'],
 				]
-				
 			)
 			matches_mapping = matches[[
 				f"{account_conflict_on}_new", f"{self.compare_index}_compare"
@@ -240,7 +239,9 @@ class DataLoader:
 		print(f'Existing accounts: {len(existing_accounts)}')
 		print(f'New accounts: {len(new_accounts)}')
 
-		new_accounts_resp = {'insert': {}}
+		# Account Creation
+		new_accountid_mapping = None
+
 		if create_accounts and len(new_accounts) > 0:
 			new_accounts_resp = self.to_sf(
 				tablename='Account',
@@ -254,15 +255,19 @@ class DataLoader:
 				verbose=verbose
 			)
 
-		existing_accounts_resp = {'update': {}}
+			new_accountid_mapping =  pd.DataFrame(new_accounts_resp.get('insert', {}).get('result', []))
+			new_accountid_mapping = new_accountid_mapping[list(set(['id'] + [account_conflict_on]))]
+
+		# Account Update
+		existing_accountid_mapping = None
+
 		if update_accounts and len(existing_accounts) > 0:
 			existing_accounts_resp = self.to_sf(
 				tablename='Account',
 				dataframe=existing_accounts,
 				update=True,
 				insert=False,
-				conflict_on=list(set(['Id'] + [account_conflict_on])),
-				# conflict_on='Id',
+				conflict_on='Id',
 				return_response=True,
 				overwrite=True if account_overwrite_columns else False,
 				overwrite_columns=account_overwrite_columns,
@@ -270,10 +275,19 @@ class DataLoader:
 				update_diff_on=update_only_missing_on,
 			)
 
-		accountid_mapping = new_accounts_resp.get('insert', {}).get('result', []) + \
-			existing_accounts_resp.get('update', {}).get('result', [])
+			resp_ids = existing_accounts_resp.get('update', {}).get('result', [])
+			resp_ids = [r.get('id') for r in resp_ids]
 
-		accountid_mapping = pd.DataFrame(accountid_mapping)
+			filtered_existing_accounts = existing_accounts[list(set(['Id'] + [account_conflict_on]))]
+			filtered_existing_accounts = filtered_existing_accounts[
+				filtered_existing_accounts['Id'].isin(resp_ids)
+			]
+			filtered_existing_accounts = filtered_existing_accounts.rename(columns={'Id': 'id'})
+
+			existing_accountid_mapping = filtered_existing_accounts.copy()
+
+		# Account Id Mapping
+		accountid_mapping = pd.concat([existing_accountid_mapping, new_accountid_mapping], axis=0)
 
 		if account_conflict_on != 'Id':
 			accountid_mapping = accountid_mapping[['id'] +  [account_conflict_on]]
