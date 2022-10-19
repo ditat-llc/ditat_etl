@@ -93,6 +93,7 @@ class Hubspot:
 		self,
 		object_type: str,
 		date_window: float=1,
+		date_column: str=None,
 		limit: int=100,
 		start_date: str=None,
 		end_date: str=None
@@ -103,6 +104,8 @@ class Hubspot:
 			- object_type (str): The object type to query.
 
 			- date_window (float, default=1): The date window to query.
+
+			- date_column (str, default=None): The date column to query.
 
 			- limit (int, default=100): The number or records per batch.
 
@@ -131,6 +134,8 @@ class Hubspot:
 			'Content-Type': 'application/json',
 		}
 
+		date_column = date_column or self.OBJECTS[object_type]['date_column']
+
 		# Period logic
 		if end_date is None:
 
@@ -156,7 +161,7 @@ class Hubspot:
 		data = {
 			'filters': [
 				{
-					'propertyName': self.OBJECTS[object_type]['date_column'],
+					'propertyName': date_column,
 					# 'operator': 'GTE',
 					'operator': 'BETWEEN',
 					'value': start_date,
@@ -166,7 +171,7 @@ class Hubspot:
 			],
 			"sorts": [
 				{
-					"propertyName": self.OBJECTS[object_type]['date_column'],
+					"propertyName": date_column,
 					"direction": "DESCENDING"
 				}
 			],
@@ -187,6 +192,7 @@ class Hubspot:
 		results = result['results']
 
 		start_date_fmt = datetime.fromtimestamp(start_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
+
 		end_date_fmt = datetime.fromtimestamp(end_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
 
 		print(f"Total {object_type} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
