@@ -7,6 +7,7 @@ import warnings
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import pandas as pd
+import numpy as np
 
 from ..time import TimeIt
 
@@ -58,7 +59,7 @@ class Postgres:
 		'location': 'jsonb',
 	}
 
-	def __init__(self, config, keep_connection_alive=False):
+	def __init__(self, config, keep_connection_alive=False, schema='public'):
 		'''
 		Args:
 			config (dict): Client configuration
@@ -77,7 +78,7 @@ class Postgres:
 
 		'''
 		self.config = config
-		self._schema = 'public'
+		self._schema = schema
 		self.keep_connection_alive = keep_connection_alive
 
 		if self.keep_connection_alive is True:
@@ -167,6 +168,7 @@ class Postgres:
 		conn = psycopg2.connect(
 			**self.config,
 			# options=f'-c statement_timeout={timeout}000'
+			# options="-c search_path=dbo,public"
 		) if not self.keep_connection_alive else self.conn
 
 		conn.autocommit = True if commit else False
@@ -402,7 +404,7 @@ class Postgres:
 		keys = ', '.join(df_dict[0].keys())
 		values = [tuple(i.values()) for i in df_dict]
 
-		query = '''INSERT INTO {} ({}) VALUES '''.format(tablename, keys)
+		query = '''INSERT INTO {}.{} ({}) VALUES '''.format(self.schema, tablename, keys)
 		query += ', '.join(["%s"] * len(values))
 
 		if conflict_on:
@@ -487,9 +489,9 @@ class Postgres:
 		}
 		table_columns = list(table_data_types.keys())
 
-		for col in df.columns:
-			if col not in table_columns:
-				raise ValueError(f'{col} does not exist in the table {tablename}.')
+		# for col in df.columns:
+		# 	if col not in table_columns:
+		# 		raise ValueError(f'{col} does not exist in the table {tablename}.')
 		
 		on_columns = on_columns if isinstance(on_columns, list) else [on_columns]
 		updated_columns = [col for col in df.columns if col in table_columns if col not in on_columns]
@@ -510,6 +512,8 @@ class Postgres:
 
 			elif data_type in [int, float]:
 				# Workaround: Cannot place None with numerical.
+				df[col] = df[col].replace({None: np.nan})
+				df[col] = df[col].replace({'': np.nan})
 				df[col] = df[col].astype(str)
 				df[col] = df[col].replace({'nan': None})
 
@@ -520,6 +524,16 @@ class Postgres:
 				if df[col].dtype != 'object':
 					df[col] = df[col].astype(str)
 					df = df.replace({'nan': None})
+
+			elif data_type == 'datetime64':
+				df[col] = pd.to_datetime(df[col])
+				df[col] = df[col].astype(str)
+				df[col] = df[col].replace({'NaT': None})
+
+			# elif data_type == bool:
+			# 	df[col] = df[col].astype(bool)
+			# 	df[col] = df[col].astype(str)
+			# 	df[col] = df[col].replace({'True': 'true', 'False': 'false'})
 
 		df = df.where(pd.notnull(df), None)
 		###
@@ -534,18 +548,18 @@ class Postgres:
 			initial_source = 'target'
 			secondary_source = 'df'
 
-		query = '''UPDATE {} as target SET {} FROM (VALUES {}) AS df({}) WHERE {};'''.format(
+		query = '''UPDATE {}.{} as target SET {} FROM (VALUES {}) AS df({}) WHERE {};'''.format(
+			self.schema,
 			tablename,
 
-			', '.join([f"{col} = COALESCE({initial_source}.{col}::{data_type}, \
-				{secondary_source}.{col}::{data_type})" for col, \
+			', '.join([f"{col} = COALESCE({initial_source}.{col}::{data_type}, {secondary_source}.{col}::{data_type})" for col, \
 				data_type in table_raw_data_types.items() if col in updated_columns]),
 
 			', '.join(["%s"] * len(records)),
 
 			', '.join(df.columns.tolist()),
 
-			' AND '.join([f"df.{col} = target.{col}" for col in on_columns])
+			' AND '.join([f"df.{col}::TEXT = target.{col}::TEXT" for col in on_columns])
 		)
 		results = {}
 
@@ -563,14 +577,19 @@ class Postgres:
 
 		if insert_new:
 			on_columns_fmt = ', '.join(on_columns)
-			existing_query = 'SELECT {} FROM {}'.format(
+
+			existing_query = 'SELECT {} FROM {}.{}'.format(
 				on_columns_fmt,
+				self.schema,
 				tablename
 			)
 			existing_df = self.query(
 				query_statement=existing_query,
 				df=True
 			)
+			
+			existing_df[on_columns] = existing_df[on_columns].astype(str)
+
 			new_df = pd.merge(
 				left=df,
 				right=existing_df,
@@ -626,7 +645,7 @@ class Postgres:
 		if if_not_exists:
 			query += 'IF NOT EXISTS '
 
-		query += f"{tablename} "
+		query += f"{self.schema}.{tablename} "
 
 		columns = []
 
@@ -674,7 +693,7 @@ class Postgres:
 		if unique:
 			query += ' UNIQUE'
 
-		query += f' INDEX IF NOT EXISTS {index_name} ON {tablename} USING {method}({columns_fmt});'
+		query += f' INDEX IF NOT EXISTS {index_name} ON {self.schema}.{tablename} USING {method}({columns_fmt});'
 
 		self.query(
 			query_statement=query,
@@ -693,7 +712,7 @@ class Postgres:
 		queries = []
 
 		for col_name, col_type in col_type_mapping.items():
-			queries.append(f"ALTER TABLE {tablename} ADD COLUMN {col_name} {col_type};")
+			queries.append(f"ALTER TABLE {self.schema}.{tablename} ADD COLUMN {col_name} {col_type};")
 
 		self.query(
 			query_statement=queries,
