@@ -32,6 +32,15 @@ class Postgres:
 		'jsonb': dict,
 		'ARRAY': list
 	}
+	PYTHON_TO_POSTGRES = {
+		str: 'text',
+		float: 'double precision',
+		'datetime64': 'timestamp',
+		int: 'integer',
+		bool: 'boolean',
+		dict: 'jsonb',
+		list: 'ARRAY'
+	}
 	SF_TO_POSTGRES_TYPES = {
 		'anytype': 'varchar',
 		'base64': 'varchar',

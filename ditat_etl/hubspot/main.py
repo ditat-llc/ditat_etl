@@ -33,10 +33,28 @@ class Hubspot:
 		},
 	}
 
+	DEFAULT_DATE_WINDOW = 0.1
+
 	def __init__(self, api_key):
+		'''
+		Args:
+
+			- api_key (str): Hubspot API key
+		'''
 		self.api_key = api_key
 
-	def get_object_info(self, object_type):
+	def get_object_info(self, object_type, return_as_df=True):
+		'''
+		Args:
+
+			- object_type (str): Hubspot object type
+
+			- return_as_df (bool): Return as pandas DataFrame
+
+		Returns:
+
+			- df (pd.DataFrame) or dict: Hubspot object info	
+		'''
 		url = f"{self.BASE_URL}/crm/{self.VERSION}/properties/{object_type}"
 
 		headers = {
@@ -53,32 +71,77 @@ class Hubspot:
 
 		df = pd.DataFrame(resp['results'])
 
+		if return_as_df is False:
+			return df.to_dict(orient='records')
+
 		return df
 
-	def get_object_types(self, object_type):
+	def get_object_types(self, object_type, return_as_df=True):
+		'''
+		Based on self.get_object_info
+
+		Args:
+
+			- object_type (str): Hubspot object type
+
+			- return_as_df (bool): Return as pandas DataFrame
+
+		Returns:
+
+			- df (pd.DataFrame) or dict: Hubspot object types
+		'''
 		df = self.get_object_info(object_type)
 
 		if df is None:
 			return None
 
 		df = df[['name', 'type']]
+
 		df['original_type'] = df['type']
 
 		df['type'] = df['type'].apply(lambda x: self.TYPES_MAPPING[x])
 
 		df = df.set_index('name')
 
+		if return_as_df is False:
+			return df.to_dict(orient='records')
+
 		return df
 
 	def get_object_columns(self, object_type):
+		'''
+	    Based on self.get_object_info
+
+		Args:
+
+			- object_type (str): Hubspot object type
+
+		Returns:
+
+			- columns (list): Hubspot object columns
+		'''
+
 		df = self.get_object_info(object_type)
 
 		if df is None:
 			return None
 
-		return df['name'].tolist()
+		columns =  df['name'].tolist()
+
+		return columns
 
 	def map_types(self, object_type, df):
+		'''
+		Args:
+
+			- object_type (str): Hubspot object type
+
+			- df (pd.DataFrame): DataFrame to map types
+
+		Returns:
+
+			- df (pd.DataFrame): DataFrame with mapped types
+		'''
 		df = df.copy()
 
 		object_type_df = self.get_object_types(object_type)
@@ -89,14 +152,48 @@ class Hubspot:
 
 		return df
 
+	@staticmethod
+	def date_range(start, end, intv, fmt='%Y/%m/%d'):
+		'''
+		Function to split date range into intervals.
+		This is used to split the start and end date when the total number
+		of records is greater than 10,000.
+
+		Args:
+
+			- start (str): Start date
+
+			- end (str): End date
+
+			- intv (int): Interval
+
+			- fmt (str): Date format
+
+		Returns:
+
+			- date_range (iter): Date range iterator
+		'''
+		start = datetime.strptime(start, fmt)
+
+		end = datetime.strptime(end, fmt)
+
+		diff = (end  - start ) / intv
+
+		for i in range(intv):
+
+			yield (start + diff * i).strftime('%Y/%m/%dT%H:%M:%S')
+
+		yield end.strftime('%Y/%m/%dT%H:%M:%S')
+
 	def query(
 		self,
 		object_type: str,
-		date_window: float=1,
+		date_window: float=None,
 		date_column: str=None,
 		limit: int=100,
 		start_date: str=None,
-		end_date: str=None
+		end_date: str=None,
+		date_fmt: str='%Y/%m/%d',
 	):
 		'''
 		Args:
@@ -113,6 +210,8 @@ class Hubspot:
 
 			- end_date (str, default=None): Format: YYYY/MM/DD.
 
+			- date_fmt (str, default='%Y/%m/%d'): Date format.
+
 		Returns:
 			
 			- df (pd.DataFrame): The query results.
@@ -121,8 +220,13 @@ class Hubspot:
 			
 			- If start_date and end_date are not provided, the function will
 			query the last date_window days.
+
+			- When the total number of records is greater than 10,000,
+			a new set is created of length N = total_records / 10,000.
+			The function calls itself N times, allowing for recursion if necessary.
 		
 		'''
+		date_window = date_window or self.DEFAULT_DATE_WINDOW
 
 		if object_type not in self.OBJECTS:
 			raise ValueError(f'Object type must be one of {self.OBJECTS}')
@@ -143,7 +247,7 @@ class Hubspot:
 
 		else:
 
-			end_date = datetime.strptime(end_date, '%Y/%m/%d')
+			end_date = datetime.strptime(end_date, date_fmt)
 
 		end_date = end_date.timestamp() * 1000
 
@@ -153,16 +257,21 @@ class Hubspot:
 
 		else:
 			
-			start_date = datetime.strptime(start_date, '%Y/%m/%d').timestamp() * 1000
+			start_date = datetime.strptime(start_date, date_fmt).timestamp() * 1000
 
 		start_date = int(start_date)
+
 		end_date = int(end_date)
 
+		start_date_fmt = datetime.fromtimestamp(start_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
+
+		end_date_fmt = datetime.fromtimestamp(end_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
+
+		# Payload
 		data = {
 			'filters': [
 				{
 					'propertyName': date_column,
-					# 'operator': 'GTE',
 					'operator': 'BETWEEN',
 					'value': start_date,
 					'highValue': end_date,
@@ -191,11 +300,44 @@ class Hubspot:
 		total = result['total']
 		results = result['results']
 
-		start_date_fmt = datetime.fromtimestamp(start_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
 
-		end_date_fmt = datetime.fromtimestamp(end_date / 1000).strftime('%Y/%m/%dT%H:%M:%S')
+		print(f"Total {object_type} using {date_column} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
 
-		print(f"Total {object_type} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
+		if total == 0:
+			return None
+
+		if total > 10_000:
+			# In this case we create more splits (n) and calls itself n times.
+
+			print('WARNING: The total number of records is greater than 10,000.')
+
+			date_range = self.date_range(
+				start_date_fmt,
+				end_date_fmt,
+				int(total / 1000),
+				fmt='%Y/%m/%dT%H:%M:%S',
+			)
+			date_range = list(date_range)
+
+			print(f"Splitting date range in {int(total / 1000)} batches.")
+
+			df_list = []
+
+			for i, v in enumerate(date_range[:-1]):
+
+				df = self.query(
+					object_type=object_type,
+					date_column=date_column,
+					start_date=v,
+					end_date=date_range[i + 1],
+					date_fmt='%Y/%m/%dT%H:%M:%S',
+				)
+
+				df_list.append(df)
+
+			df = pd.concat(df_list)
+
+			return df
 
 		df_list = []
 
@@ -209,6 +351,10 @@ class Hubspot:
 				headers=headers,
 				json=data,
 			)
+
+			if response.status_code != 200:
+				print(response.text)
+				continue
 
 			df_list.extend(response.json()['results'])
 			
