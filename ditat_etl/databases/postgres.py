@@ -517,7 +517,11 @@ class Postgres:
 				df[col] = df[col].apply(literal_eval)
 
 			elif data_type == dict:
-				df[col] = df[col].apply(literal_eval).apply(json.dumps)
+				df[col] = df[col].apply(
+					lambda x: literal_eval(x) if x not in ['null']  else x
+				).apply(
+					lambda x: json.dumps(x) if isinstance(x, dict) else x
+				)
 
 			elif data_type in [int, float]:
 				# Workaround: Cannot place None with numerical.

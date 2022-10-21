@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timedelta
+
 import requests
 import pandas as pd
 import numpy as np
@@ -15,6 +17,7 @@ class Hubspot:
 		'date': 'datetime64',
 		'bool': bool,
 		'phone_number': str,
+		'json': dict,
 	}
 
 	VERSION = 'v3'
@@ -31,7 +34,26 @@ class Hubspot:
 		'deals': {
 			"date_column": "hs_lastmodifieddate",
 		},
+		'tasks': {
+			"date_column": "hs_lastmodifieddate",
+		},
+		'calls': {
+			"date_column": "hs_lastmodifieddate",
+		},
+		'emails': {
+			"date_column": "hs_lastmodifieddate",
+		},
+		'meetings': {
+			"date_column": "hs_lastmodifieddate",
+		},
+		'notes': {
+			"date_column": "hs_lastmodifieddate",
+		},
+		'postal_mail': {
+			"date_column": "hs_lastmodifieddate",
+		},
 	}
+	
 
 	DEFAULT_DATE_WINDOW = 0.1
 
@@ -42,6 +64,22 @@ class Hubspot:
 			- api_key (str): Hubspot API key
 		'''
 		self.api_key = api_key
+
+	def get_owners(self):
+		url = f"{self.BASE_URL}/crm/{self.VERSION}/owners"
+
+		headers = {
+			'Authorization': f'Bearer {self.api_key}',
+			'Content-Type': 'application/json',
+		}
+
+		response = requests.get(url, headers=headers)
+
+		results = response.json()['results']
+
+		df = pd.DataFrame(results)
+
+		return df
 
 	def get_object_info(self, object_type, return_as_df=True):
 		'''
@@ -144,9 +182,16 @@ class Hubspot:
 		'''
 		df = df.copy()
 
-		object_type_df = self.get_object_types(object_type)
+		mappings = self.get_object_types(object_type).to_dict()['type']
 
-		df = df.astype(object_type_df.to_dict()['type'], errors='ignore')
+		for col, dtype in mappings.items():
+
+			if dtype in [dict, list]:
+				df[col] = df[col].apply(lambda x: json.dumps(x))
+
+			else:
+			
+				df[col] = df[col].astype(dtype, errors='ignore')
 
 		df.replace(to_replace=['None'], value=np.nan, inplace=True)
 
@@ -293,6 +338,7 @@ class Hubspot:
 		response = requests.post(url, headers=headers, json=data)
 
 		if response.status_code != 200:
+			print(response.text)
 			return None
 
 		result = response.json()
