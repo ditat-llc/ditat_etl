@@ -39,7 +39,7 @@ class Postgres:
 		int: 'integer',
 		bool: 'boolean',
 		dict: 'jsonb',
-		list: 'ARRAY'
+		list: 'jsonb'
 	}
 	SF_TO_POSTGRES_TYPES = {
 		'anytype': 'varchar',
@@ -510,18 +510,23 @@ class Postgres:
 		# Data formatting
 		filtered_data_types = {k: j for k, j in table_data_types.items() if k in df.columns}
 
+		def f(x):
+			if type(x) in [list, dict]:
+				pass
+
+			elif x in [np.nan, 'null', None, 'None']:
+				return None
+
+			else:
+				x = literal_eval(x)
+
+			return json.dumps(x)
+
 		for col in df.columns:
 			data_type = filtered_data_types[col]
 
-			if data_type == list:
-				df[col] = df[col].apply(literal_eval)
-
-			elif data_type == dict:
-				df[col] = df[col].apply(
-					lambda x: literal_eval(x) if x not in ['null']  else x
-				).apply(
-					lambda x: json.dumps(x) if isinstance(x, dict) else x
-				)
+			if data_type in [list, dict]:
+				df[col] = df[col].apply(f)
 
 			elif data_type in [int, float]:
 				# Workaround: Cannot place None with numerical.

@@ -34,6 +34,9 @@ class Hubspot:
 		'deals': {
 			"date_column": "hs_lastmodifieddate",
 		},
+		'tickets': {
+			"date_column": "hs_lastmodifieddate",
+		},
 		'tasks': {
 			"date_column": "hs_lastmodifieddate",
 		},
@@ -52,8 +55,20 @@ class Hubspot:
 		'postal_mail': {
 			"date_column": "hs_lastmodifieddate",
 		},
+		'owners': {},
 	}
-	
+
+	OWNER_TYPES = {
+		"id": int,
+		"email": str,
+		"firstName": str,
+		"lastName": str,
+		"userId": int,
+		"createdAt": 'datetime64',
+		"updatedAt": 'datetime64',
+		"archived": bool,
+		"teams": list,
+	}
 
 	DEFAULT_DATE_WINDOW = 0.1
 
@@ -64,22 +79,6 @@ class Hubspot:
 			- api_key (str): Hubspot API key
 		'''
 		self.api_key = api_key
-
-	def get_owners(self):
-		url = f"{self.BASE_URL}/crm/{self.VERSION}/owners"
-
-		headers = {
-			'Authorization': f'Bearer {self.api_key}',
-			'Content-Type': 'application/json',
-		}
-
-		response = requests.get(url, headers=headers)
-
-		results = response.json()['results']
-
-		df = pd.DataFrame(results)
-
-		return df
 
 	def get_object_info(self, object_type, return_as_df=True):
 		'''
@@ -103,6 +102,7 @@ class Hubspot:
 		response = requests.get(url, headers=headers)
 
 		if response.status_code != 200:
+			print(response.text)
 			return None
 
 		resp = response.json()
@@ -230,6 +230,54 @@ class Hubspot:
 
 		yield end.strftime('%Y/%m/%dT%H:%M:%S')
 
+	def get_owners(self):
+		'''
+		Returns:
+
+			- df (pd.DataFrame): Hubspot owners
+		'''
+		url = f"{self.BASE_URL}/crm/{self.VERSION}/owners"
+
+		headers = {
+			'Authorization': f'Bearer {self.api_key}',
+			'Content-Type': 'application/json',
+		}
+
+		params = {'limit': 100}
+
+		result_list = []
+
+		response = requests.get(url, headers=headers, params=params)
+
+		if response.status_code != 200:
+			print(response.text)
+			return
+
+		results = response.json()['results']
+
+		result_list.extend(results)
+
+		next_page = response.json()['paging'].get('next', {}).get('link')
+
+		while next_page is not None:
+
+			response = requests.get(next_page, headers=headers)
+
+			if response.status_code != 200:
+				print(response.text)
+				return
+
+			results = response.json()['results']
+
+			result_list.extend(results)
+
+			next_page = response.json().get('paging', {}).get(
+				'next', {}).get('link')
+
+		df = pd.DataFrame(result_list)
+
+		return df
+
 	def query(
 		self,
 		object_type: str,
@@ -269,8 +317,13 @@ class Hubspot:
 			- When the total number of records is greater than 10,000,
 			a new set is created of length N = total_records / 10,000.
 			The function calls itself N times, allowing for recursion if necessary.
+
+			- If object_type is 'owners', the function will return the owners.
 		
 		'''
+		if object_type == 'owners':
+			return self.get_owners()
+
 		date_window = date_window or self.DEFAULT_DATE_WINDOW
 
 		if object_type not in self.OBJECTS:
