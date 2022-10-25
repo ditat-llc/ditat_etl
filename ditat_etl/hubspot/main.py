@@ -257,7 +257,7 @@ class Hubspot:
 
 		result_list.extend(results)
 
-		next_page = response.json()['paging'].get('next', {}).get('link')
+		next_page = response.json().get('paging', {}).get('next', {}).get('link')
 
 		while next_page is not None:
 
