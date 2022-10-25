@@ -23,6 +23,21 @@ class DataLoader:
 
 		self.matcher = Matcher(exact_domain=False)
 
+	def __str__(self):
+		return str(self.sf)
+
+	def __repr__(self):
+		return repr(self.sf)
+
+	@classmethod
+	def from_instance(cls, sf_instance):
+		config = {
+			'config': sf_instance.config_params,
+			'client_id': sf_instance.client_id,
+			'client_secret': sf_instance.client_secret,
+		}
+		return cls(config=config)
+
 	def load_account_compare_data(
 		self,
 		data: pd.DataFrame=None,

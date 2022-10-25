@@ -87,13 +87,13 @@ class SalesforceObj():
 		refresh_token = self.config_params.get('session_id') 
 
 		if refresh_token:
-			print('Logging in with refresh token')
 			self.refresh_token(refresh_token)
 			self.sf = Salesforce(instance_url=self.instance_url, session_id=self.access_token)
+			print('Salesforce login using refresh token.')
 
 		else:
-			print('Logging in with username/password.')
 			self.sf = Salesforce(**self.config_params)
+			print('Salesforce login using username/password.')
 
 	def refresh_token(
 		self,
