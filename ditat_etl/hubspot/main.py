@@ -146,6 +146,35 @@ class Hubspot:
 
 		return df
 
+	def get_associations(self, from_object, to_object, ids, return_as_df=True):
+		url = f"{self.BASE_URL}/crm/{self.VERSION}/associations/{from_object}/{to_object}/batch/read"
+
+		headers = {
+			'Authorization': f'Bearer {self.api_key}',
+			'Content-Type': 'application/json',
+		}
+
+		data = {
+			"inputs": ids
+		}
+
+		response = requests.post(url, headers=headers, data=json.dumps(data))
+
+		if response.status_code != 200:
+			print(response.text)
+			return None
+
+		resp = response.json()['results']
+
+		resp = [{
+			"from": x['from']['id'], "to": x['to'][0]['id'], 'type': x['to'][0]['type']
+		} for x in resp]
+
+		if return_as_df is False:
+			return resp
+
+		return pd.DataFrame(resp)
+
 	def get_object_columns(self, object_type):
 		'''
 	    Based on self.get_object_info
