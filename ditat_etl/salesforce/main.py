@@ -479,7 +479,7 @@ class SalesforceObj():
 
 		date_from_fmt = date_from.strftime('%Y-%m-%dT00:00:00.000Z')
 
-		date_to = datetime.today() + timedelta(days=1)
+		date_to = datetime.today() + timedelta(days=2)
 
 		diff = (date_to  - date_from ) / n_chunks
 
