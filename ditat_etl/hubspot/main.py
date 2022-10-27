@@ -160,7 +160,7 @@ class Hubspot:
 
 		response = requests.post(url, headers=headers, data=json.dumps(data))
 
-		if response.status_code != 200:
+		if response.status_code not in [200, 207]:
 			print(response.text)
 			return None
 

@@ -445,7 +445,9 @@ class Postgres:
 			mogrify_tuple=values,
 			verbose=verbose
 		)
-		print(result)
+		if verbose:
+			print(result)
+
 		return result
 
 	@TimeIt()
@@ -626,7 +628,7 @@ class Postgres:
 					commit=commit,
 					conflict_on=None,
 					do_update_columns=False,
-					verbose=verbose
+					verbose=False
 				)
 				results['insert'] = result
 			else:
