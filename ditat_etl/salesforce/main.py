@@ -883,11 +883,6 @@ class SalesforceObj():
 		# Droping duplicates
 		dataframe.drop_duplicates(subset=conflict_on, inplace=True)
 
-		# for col in dataframe.columns:
-		# 	if dataframe[col].dtype == 'object':
-		# 		dataframe[col] = dataframe[col].str.replace(
-		# 			"\\", "", regex=True).str.replace("'", "\\'")
-
 		# Workaround regardless of whether id is in dataframe or not
 		columns = list(set(dataframe.columns.tolist() + ['Id']))
 
@@ -945,8 +940,9 @@ class SalesforceObj():
 			
 			for c in update_diff_on:
 				subselection = existing_df.loc[
-					(existing_df[c] != existing_df[f"{c}__current"])
+					(existing_df[c].astype(str) != existing_df[f"{c}__current"].astype(str))
 					& (existing_df[c].notnull())
+					& (existing_df[c] != '')
 				, :].index.tolist()
 
 				selected_indexes.extend(subselection)

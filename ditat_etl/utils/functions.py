@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd 
+import numpy as np
 
 # Avoid going to database if files already exists locally.
 def load_table(
@@ -34,3 +35,35 @@ def int_to_chunks(number, n):
     for i in range(diff):
         l[i] += 1
     return l
+
+
+def sanitize_join_values(values, null_type=None, return_as_list=True):
+	'''
+	This function aims to format properly the values used to join tables.
+	Sometimes you will see values that are used as ids as numeric, also with
+	decimals.
+	'''
+	values = pd.Series(values)
+
+	t = values.dtype
+
+	if t == 'object':
+		values = values.astype(str)
+
+	elif values.dtype in ['int64', 'float64']:
+		values = values.astype('Int64').astype(str)
+		values = values.replace('<NA>', null_type)
+
+	if return_as_list:
+		values = values.tolist()
+
+	return values
+
+
+
+
+
+
+
+
+
