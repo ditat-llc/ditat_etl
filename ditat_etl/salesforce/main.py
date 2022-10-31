@@ -470,6 +470,8 @@ class SalesforceObj():
 				min_date_query, include_deleted=include_deleted
 			)['records'][0]['expr0']
 
+			date_from_fmt = date_from_fmt or '2000-01-01T00:00:00.000Z'
+
 			date_from = datetime.strptime(date_from_fmt, '%Y-%m-%dT%H:%M:%S.000+0000')
 			# if date_from_fmt:
 			# 	date_from = datetime.strptime(date_from_fmt, '%Y-%m-%dT%H:%M:%S.000+0000')
