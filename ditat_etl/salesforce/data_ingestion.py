@@ -174,6 +174,7 @@ class DataLoader:
 		verbose=False,
 		update_only_missing_on: list=None,
 		account_overwrite_columns: str or list=None,
+		contact_overwrite_columns: str or list=None,
 	):
 		'''
 		Args:
@@ -197,6 +198,11 @@ class DataLoader:
 				If not None, only update records where there is a 
 				difference in these columns. It saves api calls.
 
+			- account_overwrite_columns (str | List(str), default=None):
+				If not None, overwrite these columns on update.
+
+			- contact_overwrite_columns (str | List(str), default=None):
+				If not None, overwrite these columns on update.
 		'''
 		if self.set_Account is False:
 			raise ValueError('Account data has not been loaded')
@@ -345,7 +351,7 @@ class DataLoader:
 					conflict_on=contact_conflict_on,
 					return_response=True,
 					overwrite=False,
-					overwrite_columns=None,
+					overwrite_columns=contact_overwrite_columns,
 					verbose=verbose
 				)
 			else:

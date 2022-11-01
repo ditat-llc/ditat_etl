@@ -47,8 +47,18 @@ def sanitize_join_values(values, null_type=None, return_as_list=True):
 
 	t = values.dtype
 
+	def f(x):
+		if pd.isnull(x):
+			return null_type
+		try:
+			x = float(x)
+			x = int(x)
+		except:
+			pass
+		return str(x)
+
 	if t == 'object':
-		values = values.astype(str)
+		values = values.apply(f)
 
 	elif values.dtype in ['int64', 'float64']:
 		values = values.astype('Int64').astype(str)
