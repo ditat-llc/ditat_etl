@@ -350,7 +350,7 @@ class DataLoader:
 					insert=create_contacts,
 					conflict_on=contact_conflict_on,
 					return_response=True,
-					overwrite=True if account_overwrite_columns else False,
+					overwrite=True if contact_overwrite_columns else False,
 					overwrite_columns=contact_overwrite_columns,
 					verbose=verbose
 				)
