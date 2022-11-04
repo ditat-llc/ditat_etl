@@ -383,14 +383,14 @@ class SalesforceObj():
 					datetime.today() - timedelta(days=date_window)
 				).strftime('%Y-%m-%dT00:00:00.000Z')
 
-				query += f" WHERE {date_window_variable} > {date_from}"
+				query += f" WHERE {date_window_variable} >= {date_from}"
 
 			# Using date_to AND date_from
 			elif date_from and date_to:
-				query += f" WHERE {date_window_variable} > {date_from} AND {date_window_variable} <= {date_to}"
+				query += f" WHERE {date_window_variable} >= {date_from} AND {date_window_variable} <= {date_to}"
 
 			elif date_from:
-				query += f" WHERE {date_window_variable} > {date_from}"
+				query += f" WHERE {date_window_variable} >= {date_from}"
 
 			elif date_to:
 				query += f" WHERE {date_window_variable} <= {date_to}"
