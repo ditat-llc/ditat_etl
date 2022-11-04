@@ -222,7 +222,7 @@ class Hubspot:
 			
 				df[col] = df[col].astype(dtype, errors='ignore')
 
-		df.replace(to_replace=['None'], value=np.nan, inplace=True)
+		df.replace(to_replace=['None', ''], value=np.nan, inplace=True)
 
 		return df
 
