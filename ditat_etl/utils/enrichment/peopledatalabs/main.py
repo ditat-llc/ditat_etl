@@ -393,7 +393,8 @@ class PeopleDataLabs:
 			# 'ticker': ['ticker'],
 		}
 
-		if not all(i in kwargs for i in required_fields):
+		# if not all(i in kwargs for i in required_fields):
+		if not any(i in kwargs for i in required_fields):
 			raise ValueError(f'You need to specify all of of {required_fields}')
 
 		### STEP 1: Checking for a valid domain/website

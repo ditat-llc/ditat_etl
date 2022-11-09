@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 
 from .scopes import scopes
+from ..utils.functions import sanitize_join_values
 
 
 class Outreach:
@@ -21,6 +22,9 @@ class Outreach:
 		'users',
 		'mailboxes',
 		'prospects',
+		'accounts',
+		'opportunities',
+		'tasks',
 	]
 
 	def __init__(
@@ -115,6 +119,7 @@ class Outreach:
 		date_to: str=None,
 		date_variable: str='updatedAt',
 		chunk_size: int=50,
+		data_types: bool=True,
 		**kwargs
 		):
 		"""
@@ -206,6 +211,25 @@ class Outreach:
 
 		if return_as_dataframe:
 			result = pd.json_normalize(result['data'])
+
+			if data_types:
+				
+				# Datetimes
+				datetime_columns = [c for c in result.columns if c.endswith('At')]
+
+				for c in datetime_columns:
+					result[c] = pd.to_datetime(result[c], format='%Y-%m-%dT%H:%M:%S.000Z')
+
+				# Ids
+				id_columns = [
+					c for c in result.columns if c.endswith('Id') or c.lower() == 'id'
+				]
+
+				for c in id_columns:
+					result[c] = sanitize_join_values(result[c])
+
+			# replace periods
+			result.columns = [c.replace('.', '_') for c in result.columns]
 
 		return result
 			
