@@ -228,6 +228,14 @@ class Outreach:
 				for c in id_columns:
 					result[c] = sanitize_join_values(result[c])
 
+				# Strings
+				string_columns = [
+					c for c in result.columns if result[c].dtype == 'object'
+				]
+
+				for c in string_columns:
+					result[c] = result[c].astype(str)
+
 			# replace periods
 			result.columns = [c.replace('.', '_') for c in result.columns]
 

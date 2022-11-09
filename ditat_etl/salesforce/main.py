@@ -88,7 +88,11 @@ class SalesforceObj():
 
 		if refresh_token:
 			self.refresh_token(refresh_token)
-			self.sf = Salesforce(instance_url=self.instance_url, session_id=self.access_token)
+			self.sf = Salesforce(
+				instance_url=self.instance_url,
+				session_id=self.access_token,
+				# version=self.config_params.get('version')
+			)
 			print('Salesforce login using refresh token.')
 
 		else:
