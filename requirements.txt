@@ -4,9 +4,11 @@ async-generator==1.10
 async-timeout==4.0.2
 attrs==21.4.0
 Authlib==1.0.1
+beautifulsoup4==4.11.1
 blis==0.7.7
 boto3==1.23.1
 botocore==1.26.1
+bs4==0.0.1
 cached-property==1.5.2
 catalogue==2.0.7
 certifi==2021.10.8
@@ -54,6 +56,7 @@ slackclient==2.9.4
 smart-open==5.2.1
 sniffio==1.2.0
 sortedcontainers==2.4.0
+soupsieve==2.3.2.post1
 spacy==3.3.0
 spacy-legacy==3.0.9
 spacy-loggers==1.0.2
