@@ -1,12 +1,27 @@
+import time
+
 from datetime import datetime, timedelta
 import requests
 import pandas as pd
+from bs4 import BeautifulSoup
 
 from .scopes import scopes
 from ..utils.functions import sanitize_join_values
 
 
 class Outreach:
+
+	OUTREACH_TO_PYTHON = {
+		'string': str,
+		'integer': int,
+		'float': float,
+		'boolean': bool,
+		'date-time': 'datetime64',
+		'date': 'datetime64',
+		'object': dict,
+		'email': str,
+
+	}
 
 	BASE_URL = 'https://api.outreach.io'
 
@@ -16,16 +31,32 @@ class Outreach:
 
 	SCOPES = scopes
 
-	RESOURCES = [
-		'calls',
-		'mailings',
-		'users',
-		'mailboxes',
-		'prospects',
-		'accounts',
-		'opportunities',
-		'tasks',
-	]
+	RESOURCES = {
+		'calls': {
+			'singular': 'call'
+		},
+		'mailings': {
+			'singular': 'mailing'
+		},
+		'users': {
+			'singular': 'user'
+		},
+		'mailboxes': {
+			'singular': 'mailbox'
+		},
+		'prospects': {
+			'singular': 'prospect'
+		},
+		'accounts': {
+			'singular': 'account'
+		},
+		'opportunities': {
+			'singular': 'opportunity'
+		},
+		'tasks': {
+			'singular': 'task'
+		},
+	}
 
 	def __init__(
 		self,
@@ -67,6 +98,64 @@ class Outreach:
 		print(fmt_url)
 
 		return fmt_url
+
+	@classmethod
+	def get_resource_info(
+		cls,
+		resource: str,
+		return_as_df: bool=True,
+		):
+		"""
+		Get the information about a resource.
+
+		Args:
+
+			- resource (str): The name of the resource.
+
+		"""
+		print(f"Getting data types about the {resource} resource.")
+
+		url = f'{cls.API_URL}/docs'
+
+		response = requests.get(url)
+
+		soup = BeautifulSoup(response.text, 'lxml')
+
+		h3 = soup.find('h3', id=resource)
+
+		attributes = h3.find_next('table')
+		relationships = attributes.find_next('table')
+		
+		attributes = pd.read_html(str(attributes))[0]
+		relationships = pd.read_html(str(relationships))[0]
+
+		attributes[['name', 'type']] = attributes['Attribute Name'].str.split(' ', 1, expand=True)
+		attributes = attributes[['name', 'type']]
+
+		relationships['name'] = relationships['Relationship Name']
+		relationships['type'] = 'string'
+		relationships = relationships[['name', 'type']]
+
+		if return_as_df:
+
+			attributes['name'] = 'attributes_' + attributes['name']
+
+			relationships['name'] = 'relationships_' + relationships['name']
+
+			df = pd.concat([attributes, relationships], axis=0)
+
+			df['python_type'] = df['type'].map(cls.OUTREACH_TO_PYTHON)
+
+			return df
+
+		else:
+			result = {
+				'attributes': attributes.to_dict('records'),
+				'relationships': relationships.to_dict('records'),
+				'resource': resource,
+		}
+
+		return result
 
 	def token(self, value: str, grant_type: str='refresh_token'):
 		"""
@@ -119,7 +208,6 @@ class Outreach:
 		date_to: str=None,
 		date_variable: str='updatedAt',
 		chunk_size: int=50,
-		data_types: bool=True,
 		**kwargs
 		):
 		"""
@@ -144,6 +232,10 @@ class Outreach:
 			- date_variable (str, default='updatedAt'): The variable to
 				use for the date range. Other possible values are
 				'createdAt' and 'deletedAt'.
+
+			- chunk_size (int, default=50): The number of records to get
+				at a time.
+
 		"""
 
 		if resource not in self.RESOURCES:
@@ -172,8 +264,14 @@ class Outreach:
 		params.update(kwargs)
 
 		# Getting an access token if we don't have one.
-		if not self.access_token:
-			self.token(self.refresh_token)
+		for _ in range(10):
+
+			if not self.access_token:
+				self.token(self.refresh_token)
+				time.sleep(1)
+
+			else:
+				break
 
 		print(f"Getting {resource} using {date_variable} from [{date_from}] to [{date_to}].")
 
@@ -212,32 +310,22 @@ class Outreach:
 		if return_as_dataframe:
 			result = pd.json_normalize(result['data'])
 
-			if data_types:
-				
-				# Datetimes
-				datetime_columns = [c for c in result.columns if c.endswith('At')]
-
-				for c in datetime_columns:
-					result[c] = pd.to_datetime(result[c], format='%Y-%m-%dT%H:%M:%S.000Z')
-
-				# Ids
-				id_columns = [
-					c for c in result.columns if c.endswith('Id') or c.lower() == 'id'
-				]
-
-				for c in id_columns:
-					result[c] = sanitize_join_values(result[c])
-
-				# Strings
-				string_columns = [
-					c for c in result.columns if result[c].dtype == 'object'
-				]
-
-				for c in string_columns:
-					result[c] = result[c].astype(str)
-
 			# replace periods
 			result.columns = [c.replace('.', '_') for c in result.columns]
+
+			# Datetimes
+			datetime_columns = [c for c in result.columns if c.endswith('At')]
+
+			for c in datetime_columns:
+				result[c] = pd.to_datetime(result[c], format='%Y-%m-%dT%H:%M:%S.000Z')
+
+			# Ids
+			id_columns = [
+				c for c in result.columns if c.endswith('Id') or c.lower() == 'id'
+			]
+
+			for c in id_columns:
+				result[c] = sanitize_join_values(result[c])
 
 		return result
 			

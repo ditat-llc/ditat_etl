@@ -42,6 +42,7 @@ setup(
         'simple-salesforce',
         'spacy',
 		'slackclient',
+		'bs4',
 	]
 
 )
