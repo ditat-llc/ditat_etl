@@ -823,7 +823,8 @@ class SalesforceObj():
 		overwrite_columns: str or List[str]=None,
 		verbose: bool=False,
 		update_diff_on: List[str]=None,
-	):
+		use_parallelism: bool=True,
+		):
 		'''
 		Args:
 			- tablename (str): SObject in Salesforce
@@ -857,6 +858,9 @@ class SalesforceObj():
 
 			- update_diff_on (list, default=None): Update only where these
 				columns are different from current and new.
+
+			- use_parallelism (bool, default=True): Use parallelism to query existing
+				data in salesforce.
 
 		Returns:
 			- response_payload (dict)
@@ -893,17 +897,30 @@ class SalesforceObj():
 		columns = list(set(dataframe.columns.tolist() + ['Id']))
 
 		# Getting current data
-		sf_df = self.query_parallel(
-			tablename,
-			columns=columns,
-			limit=None,
-			df=True,
-			date_window=None,
-			date_window_variable='LastModifiedDate',
-			verbose=False,
-			include_deleted=False,
-			n_chunks=5
-		)
+		if use_parallelism:
+			sf_df = self.query_parallel(
+				tablename,
+				columns=columns,
+				limit=None,
+				df=True,
+				date_window=None,
+				date_window_variable='LastModifiedDate',
+				verbose=False,
+				include_deleted=False,
+				n_chunks=5,
+			)
+
+		else:
+			sf_df = self.query(
+				tablename,
+				columns=columns,
+				limit=None,
+				df=True,
+				date_window=None,
+				date_window_variable='LastModifiedDate',
+				verbose=False,
+				include_deleted=False,
+			)
 
 		# Middle step to merge on conflict_on and separate new to existing.
 		sf_df.columns = [
