@@ -78,6 +78,10 @@ class SalesforceObj():
 	def __str__(self):
 		return self.sf.sf_instance
 
+	@property
+	def remaining_api_calls(self):
+		return self.sf.limits()['DailyApiRequests']['Remaining']
+
 	def login(self):
 		'''
 		This class will eventually only use oauth2 refresh tokens because
@@ -311,39 +315,42 @@ class SalesforceObj():
 		include_deleted=True,
 		timeout=None,
 		max_columns=100, # SF limit on columns
+		show_api_usage=False,
 		):
 		'''
 		Returns dictionary of the columns requested from the table / SObject specified.
 		If no columns or wrong columns are provided, it returns all the columns.
 
 		Args:
-			tablename (str): SObject Resource from self.sf
-			
-			columns (str: default=None): Columns names to be queried.
-
-			limit (int): CHECK THIS! You have to add a limit.
-
-			df(boolean default: False): Output format Dict or pd.DataFrame
-			
-			date_from (str, default=None): It has to be in the correct format.
-
-			date_to (str, default=None): It has to be in the correct format.
+			- tablename (str): SObject Resource from self.sf
 			 
-			date_window (int, default=None): How many days to go back
+			- columns (str: default=None): Columns names to be queried.
 
-			date_window_variable (str, default='LastModifiedDate'):
-				Column name to be used for date window
+			- limit (int): CHECK THIS! You have to add a limit.
+
+			- df(boolean default: False): Output format Dict or pd.DataFrame
 			 
-			verbose (bool, default=False): print the query
+			- date_from (str, default=None): It has to be in the correct format.
 
-			include_deleted (bool, default=True): Include deleted records
+			- date_to (str, default=None): It has to be in the correct format.
+			  
+			- date_window (int, default=None): How many days to go back
 
-			timeout (int, default=None): Timeout for the query
+			- date_window_variable (str, default='LastModifiedDate'):
+			 	Column name to be used for date window
+			  
+			- verbose (bool, default=False): print the query
 
-			max_columns (int, default=100): Maximum number of columns to be queried
+			- include_deleted (bool, default=True): Include deleted records
+
+			- timeout (int, default=None): Timeout for the query
+
+			- max_columns (int, default=100): Maximum number of columns to be queried
+
+			- show_api_usage (bool, default=True): Show API usage
 
 		Returns:
-			Output format Dict or pd.DataFrame from query
+			- Output format Dict or pd.DataFrame from query
 
 		Notes:
 			- You have to decide between date_window or (date_to and date_from)
@@ -362,6 +369,8 @@ class SalesforceObj():
 
 		if columns is None or not all(item in column_names for item in columns):
 			columns = column_names
+
+		api_usage_before = self.remaining_api_calls
 
 		# Splitting in chunks
 		chunks = chunker(columns, max_columns - 1)
@@ -431,6 +440,11 @@ class SalesforceObj():
 
 			counter += 1			
 
+		api_usage_after = self.remaining_api_calls
+
+		if show_api_usage:
+			print(f'Salesforce API Usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
+
 		if df == False:
 			all_results = all_results.to_dict(orient='records')
 
@@ -448,7 +462,8 @@ class SalesforceObj():
 		date_window_variable='LastModifiedDate',
 		verbose=False,
 		include_deleted=True,
-		n_chunks=4 # Unfortunately SF limits this to 10
+		n_chunks=4, # Unfortunately SF limits this to 10
+		show_api_usage=False,
 	):
 		###### 
 		def limit_split(limit, n):
@@ -508,12 +523,22 @@ class SalesforceObj():
 			'data_window': [date_window_variable] * len(chunks),
 			'data_window_variable': [date_window_variable] * len(chunks),
 			'verbose': [verbose] * len(chunks),
-			'include_deleted': [include_deleted] * len(chunks)
+			'include_deleted': [include_deleted] * len(chunks),
+			'timeout': [None] * len(chunks),
+			'max_columns': [100] * len(chunks),
+			'show_api_usage': [False] * len(chunks),
 		}
+
+		api_usage_before = self.remaining_api_calls
 
 		with ThreadPoolExecutor() as executor:
 			results = executor.map(self.query, *payload.values())
 		results = [*results]
+
+		api_usage_after = self.remaining_api_calls
+
+		if show_api_usage:
+			print(f'Salesforce API Usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
 
 		if len([i for i in results if i is not None]) == 0:
 			return pd.DataFrame()
@@ -824,6 +849,7 @@ class SalesforceObj():
 		verbose: bool=False,
 		update_diff_on: List[str]=None,
 		use_parallelism: bool=True,
+		show_api_usage: bool=True,
 		):
 		'''
 		Args:
@@ -889,6 +915,9 @@ class SalesforceObj():
 			check_column_casing=True,
 			return_as_dict=False
 		)
+
+		# api usage before
+		api_usage_before = self.remaining_api_calls
 
 		# Droping duplicates
 		dataframe.drop_duplicates(subset=conflict_on, inplace=True)
@@ -1087,6 +1116,11 @@ class SalesforceObj():
 
 			if return_response:
 				response_payload['update']['result'] = existing_results
+
+		api_usage_after = self.remaining_api_calls
+
+		if show_api_usage:
+			print(f'Salesforce API usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
 
 		return response_payload
 
