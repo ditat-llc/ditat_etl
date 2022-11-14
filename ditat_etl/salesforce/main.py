@@ -1003,7 +1003,7 @@ class SalesforceObj():
 				existing_df.index.isin(selected_indexes)
 			]
 
-			print('Updatedable records: ', existing_df.shape[0])
+			print(f'Updatedable records: {existing_df.shape[0]}')
 
 		### PART 2: Strategy for updating value and overwrite
 		comparison_columns = [

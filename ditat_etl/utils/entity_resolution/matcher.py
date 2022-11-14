@@ -333,8 +333,8 @@ class Matcher:
 			extract_domain, isemail=self.exact_domain
 		)
 
-		df_1 = df_1[~df_1[var].isin(self.ignored_domains)]
-		df_2 = df_2[~df_2[var].isin(self.ignored_domains)]
+		df_1.drop(df_1[df_1[var].isin(self.ignored_domains)].index, inplace=True)
+		df_2.drop(df_2[df_2[var].isin(self.ignored_domains)].index, inplace=True)
 
 	@generic
 	def phone(self, df_1, df_2, var):
