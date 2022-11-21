@@ -199,6 +199,39 @@ class Outreach:
 
 		return result
 
+	@staticmethod
+	def date_range(start, end, intv, fmt='%Y-%m-%d'):
+		'''
+		Function to split date range into intervals.
+		This is used to split the start and end date when the total number
+		of records is greater than 10,000.
+
+		Args:
+
+			- start (str): Start date
+
+			- end (str): End date
+
+			- intv (int): Interval
+
+			- fmt (str): Date format
+
+		Returns:
+
+			- date_range (iter): Date range iterator
+		'''
+		start = datetime.strptime(start, fmt)
+
+		end = datetime.strptime(end, fmt)
+
+		diff = (end  - start ) / intv
+
+		for i in range(intv):
+
+			yield (start + diff * i).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+		yield end.strftime('%Y-%m-%dT%H:%M:%SZ')
+
 	def get_resource(
 		self, 
 		resource: str,
@@ -208,6 +241,7 @@ class Outreach:
 		date_to: str=None,
 		date_variable: str='updatedAt',
 		chunk_size: int=50,
+		date_fmt: str='%Y-%m-%d',
 		**kwargs
 		):
 		"""
@@ -236,6 +270,8 @@ class Outreach:
 			- chunk_size (int, default=50): The number of records to get
 				at a time.
 
+			- date_fmt (str, default='%Y-%m-%d'): The date format.
+
 		"""
 
 		if resource not in self.RESOURCES:
@@ -245,16 +281,22 @@ class Outreach:
 		if date_from or date_to:
 
 			if not date_from:
-				date_from = 'neginf'
+				date_from = '2000-01-01T00:00:00Z'
+
+			else:
+				date_to = datetime.strptime(date_to, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 			if not date_to:
-				date_to = 'inf'
+				date_to = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+			else:
+				date_from = datetime.strptime(date_from, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 		else:
 
 			date_from = (datetime.now() - timedelta(days=date_window)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-			date_to = 'inf'
+			date_to = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 		params = {
 			f"filter[{date_variable}]": f"{date_from}..{date_to}",
@@ -292,6 +334,38 @@ class Outreach:
 		total = result['meta']['count']
 		
 		print(f"Got {total} {resource}.")
+
+		if total > 10_000:
+			print('WARNING: The total number of records is greater than 10,000.')
+
+			date_range = self.date_range(
+				date_from,
+				date_to,
+				int(total / 1000),
+				fmt='%Y-%m-%dT%H:%M:%SZ',
+			)
+			date_range = list(date_range)
+
+			print(f"Splitting date range in {int(total / 1000)} batches.")
+
+			df_list = []
+
+			for i, v in enumerate(date_range[:-1]):
+
+				df = self.get_resource(
+					resource=resource,
+					date_window=None,
+					date_from=v,
+					date_to=date_range[i + 1],
+					date_fmt='%Y-%m-%dT%H:%M:%SZ',
+					date_variable=date_variable,
+				)
+
+				df_list.append(df)
+
+			df = pd.concat(df_list)
+
+			return df
 
 		for i in range(1, total // 50 + 1):
 
