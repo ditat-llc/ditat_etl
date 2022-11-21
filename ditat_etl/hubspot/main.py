@@ -316,6 +316,7 @@ class Hubspot:
 		start_date: str=None,
 		end_date: str=None,
 		date_fmt: str='%Y/%m/%d',
+		**kwargs
 	):
 		'''
 		Args:
@@ -333,6 +334,8 @@ class Hubspot:
 			- end_date (str, default=None): Format: YYYY/MM/DD.
 
 			- date_fmt (str, default='%Y/%m/%d'): Date format.
+
+			- kwargs (dict, default={}): Additional query parameters for filtering
 
 		Returns:
 			
@@ -413,6 +416,16 @@ class Hubspot:
 			],
 			"properties": self.get_object_columns(object_type),
 		}
+
+		if kwargs:
+			for key, value in kwargs.items():
+				data['filters'].append(
+					{
+						'propertyName': key,
+						'operator': 'EQ',
+						'value': value,
+					}
+				)
 
 		data['limit'] = limit
 		data['archived'] = 'false'
