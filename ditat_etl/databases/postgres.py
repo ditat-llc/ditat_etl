@@ -492,6 +492,7 @@ class Postgres:
 			- {'update': 'UPDATE {N_RECORDS}'} or {'update': 'UPDATE {N_RECORDS}', 'INSERT 0 {N_RECORDS}'}
 		'''
 		df = df.copy()
+		df.columns = [i.lower() for i in df.columns]
 
 		table_data_types = self.get_table_data_types(tablename)
 		# following line used for coalesce and casting
