@@ -284,13 +284,13 @@ class Outreach:
 				date_from = '2000-01-01T00:00:00Z'
 
 			else:
-				date_to = datetime.strptime(date_to, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
+				date_from = datetime.strptime(date_from, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 			if not date_to:
 				date_to = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 			else:
-				date_from = datetime.strptime(date_from, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
+				date_to = datetime.strptime(date_to, date_fmt).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 		else:
 
