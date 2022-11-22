@@ -56,6 +56,12 @@ class Outreach:
 		'tasks': {
 			'singular': 'task'
 		},
+		'callDispositions': {
+			'singular': 'callDisposition'
+		},
+		'callPurposes': {
+			'singular': 'callPurpose'
+		},
 	}
 
 	def __init__(

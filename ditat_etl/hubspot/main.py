@@ -317,7 +317,7 @@ class Hubspot:
 		end_date: str=None,
 		date_fmt: str='%Y/%m/%d',
 		**kwargs
-	):
+		):
 		'''
 		Args:
 
