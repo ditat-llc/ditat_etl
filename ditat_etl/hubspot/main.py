@@ -27,33 +27,43 @@ class Hubspot:
 	OBJECTS = {
 		'companies': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "company",
 		},
 		'contacts': {
 			"date_column": "lastmodifieddate",
+			"singular": "contact",
 		},
 		'deals': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "deal",
 		},
 		'tickets': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "ticket",
 		},
 		'tasks': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "task",
 		},
 		'calls': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "call",
 		},
 		'emails': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "email",
 		},
 		'meetings': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "meeting",
 		},
 		'notes': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "note",
 		},
 		'postal_mail': {
 			"date_column": "hs_lastmodifieddate",
+			"singular": "postal_mail",
 		},
 		'owners': {},
 	}
@@ -509,4 +519,68 @@ class Hubspot:
 		df = self.map_types(object_type=object_type, df=df)
 
 		return df
+
+
+	def create_record(
+		self,
+		object_type,
+		association_object: str=None,
+		association_name: str=None,
+		**kwargs
+		):
+		'''
+		Create a record in HubSpot.
+
+		Args:
+
+			- object_type (str)
+		'''
+		if object_type not in self.OBJECTS:
+			raise ValueError(f'Object type must be one of {self.OBJECTS}')
+
+		url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}"
+
+		payload = {'properties': kwargs}
+
+		headers = {
+			'Authorization': f'Bearer {self.api_key}',
+			'Content-Type': 'application/json',
+		}
+
+		response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+		if response.status_code not in [200, 201]:
+			print(response.text)
+			return None
+
+		result = response.json()
+
+		if association_object is None:
+			return result
+
+		id_ = result['id']
+
+		association_object = self.OBJECTS[association_object]['singular']
+
+		association_type = f"{self.OBJECTS[object_type]['singular']}_to_{association_object}"
+
+		association_id = result['properties'][association_name]
+
+		association_url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}/{id_}/associations/{association_object}/{association_id}/{association_type}"
+
+		association_response = requests.put(association_url, headers=headers)
+
+		if association_response.status_code != 200:
+			print(association_response.text)
+			return None
+
+		association_result = association_response.json()
+
+		result['association'] = association_result
+
+		return result
+
+
+
+
 
