@@ -520,12 +520,13 @@ class Hubspot:
 
 		return df
 
-
-	def create_record(
+	def upsert_record(
 		self,
 		object_type,
+		method: str='create',
 		association_object: str=None,
 		association_name: str=None,
+		association_id: str=None,
 		**kwargs
 		):
 		'''
@@ -534,11 +535,36 @@ class Hubspot:
 		Args:
 
 			- object_type (str)
+
+			- method (str): The method to use to create the record. Can be 'create' or 'update'.
+
+			- association_object (str): The object type to associate the record with.
+
+			- association_name (str): The name of the association.
+
+			- **kwargs: The record data.
 		'''
+		if method not in ['create', 'update']:
+			raise ValueError(f"Invalid method: {method}. It must be 'create' or 'update'.")
+
 		if object_type not in self.OBJECTS:
 			raise ValueError(f'Object type must be one of {self.OBJECTS}')
 
 		url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}"
+
+		if method == 'update':
+			id_ = kwargs.pop('id')
+
+			print(f"Updating {object_type} with id {id_}")
+
+			url += f"/{id_}"
+
+			method = 'PATCH'
+
+		else:
+			method = 'POST'
+
+			print(f"Creating {object_type}")
 
 		payload = {'properties': kwargs}
 
@@ -547,9 +573,9 @@ class Hubspot:
 			'Content-Type': 'application/json',
 		}
 
-		response = requests.post(url, headers=headers, data=json.dumps(payload))
+		response = requests.request(method=method, url=url, headers=headers, data=json.dumps(payload))
 
-		if response.status_code not in [200, 201]:
+		if str(response.status_code)[0] != '2':
 			print(response.text)
 			return None
 
@@ -564,7 +590,11 @@ class Hubspot:
 
 		association_type = f"{self.OBJECTS[object_type]['singular']}_to_{association_object}"
 
-		association_id = result['properties'][association_name]
+		association_id = association_id or result['properties'].get(association_name, {})
+
+		if not association_id:
+			print(f"Could not find association id for {association_name}")
+			return result
 
 		association_url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}/{id_}/associations/{association_object}/{association_id}/{association_type}"
 
