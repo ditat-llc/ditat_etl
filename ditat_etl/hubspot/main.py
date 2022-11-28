@@ -225,12 +225,14 @@ class Hubspot:
 
 		for col, dtype in mappings.items():
 
-			if dtype in [dict, list]:
-				df[col] = df[col].apply(lambda x: json.dumps(x))
+			if col in df.columns:
 
-			else:
-			
-				df[col] = df[col].astype(dtype, errors='ignore')
+				if dtype in [dict, list]:
+					df[col] = df[col].apply(lambda x: json.dumps(x))
+
+				else:
+				
+					df[col] = df[col].astype(dtype, errors='ignore')
 
 		df.replace(to_replace=['None', ''], value=np.nan, inplace=True)
 
@@ -326,6 +328,7 @@ class Hubspot:
 		start_date: str=None,
 		end_date: str=None,
 		date_fmt: str='%Y/%m/%d',
+		columns: list=None,
 		**kwargs
 		):
 		'''
@@ -346,6 +349,9 @@ class Hubspot:
 			- date_fmt (str, default='%Y/%m/%d'): Date format.
 
 			- kwargs (dict, default={}): Additional query parameters for filtering
+
+			- columns (list, default=None): List of columns to query. If not provided,
+				all columns will be queried.
 
 		Returns:
 			
@@ -424,7 +430,7 @@ class Hubspot:
 					"direction": "DESCENDING"
 				}
 			],
-			"properties": self.get_object_columns(object_type),
+			"properties": columns or self.get_object_columns(object_type),
 		}
 
 		if kwargs:
@@ -432,6 +438,7 @@ class Hubspot:
 				data['filters'].append(
 					{
 						'propertyName': key,
+						# 'operator': 'IN' if isinstance(value, list) else 'EQ',
 						'operator': 'EQ',
 						'value': value,
 					}
@@ -450,7 +457,6 @@ class Hubspot:
 
 		total = result['total']
 		results = result['results']
-
 
 		print(f"Total {object_type} using {date_column} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
 
@@ -482,6 +488,7 @@ class Hubspot:
 					start_date=v,
 					end_date=date_range[i + 1],
 					date_fmt='%Y/%m/%dT%H:%M:%S',
+					columns=columns,
 				)
 
 				df_list.append(df)
