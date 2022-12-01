@@ -1,4 +1,5 @@
 import time
+import json
 
 from datetime import datetime, timedelta
 import requests
@@ -408,8 +409,97 @@ class Outreach:
 				result[c] = sanitize_join_values(result[c])
 
 		return result
-			
 
-			
+	def upsert_resource(self, resource, verbose=False, **kwargs):
+		'''
+		Updates or inserts a resource.
 
+		Args:
 
+			- resource (str): The resource to update or insert.
+
+			- **kwargs: The data to update or insert.
+
+		Returns:
+
+			- The response from the API.
+
+		Notes:
+
+			- if 'id' is in the kwargs, then the resource will be updated.
+		'''
+		# Obtaining the resource information
+		fields = self.get_resource_info(
+			self.RESOURCES[resource]['singular'])[['name']]
+
+		fields[['name_first', 'name_last']] = fields['name'].str.split(
+			'_', expand=True)
+		
+		# Combining the data with the resource information
+		data = {}
+
+		for f in fields['name_first'].unique():
+
+			data[f] = {}
+
+			for _, v in fields[fields['name_first'] == f].iterrows():
+				
+				value = kwargs.get(v['name_last'].lower())
+
+				type_ = kwargs.get(f'{v["name_last"].lower()}_type')
+
+				if value:
+
+					if f == 'relationships':
+
+						data[f][v['name_last']] = {
+							'data': {
+								'id': value,
+								'type': type_ or v['name_last'],
+							}
+						}
+
+					else:
+
+						data[f][v['name_last']] = value
+
+		data = {"data": data}
+		data['data']['type'] = self.RESOURCES[resource]['singular']
+
+		if verbose:
+			print(json.dumps(data, indent=4))
+
+		# Defining update or insert depending on the presence of an id
+		method = 'PATCH' if 'id' in kwargs else 'POST'
+
+		url = f'{self.API_URL}/{resource}'
+
+		if method == 'PATCH':
+			url += f'/{kwargs["id"]}'
+
+			data['data']['id'] = kwargs['id']
+
+		# Getting an access token if we don't have one.
+		for _ in range(10):
+
+			if not self.access_token:
+				self.token(self.refresh_token)
+				time.sleep(1)
+
+			else:
+				break
+
+		# Calling the Api
+		headers = {
+			'Authorization': f'Bearer {self.access_token}',
+		}
+
+		response = requests.request(method, url, headers=headers, json=data)
+
+		if str(response.status_code)[0] != '2':
+			print(response.text)
+			return
+
+		result = response.json()
+
+		return result
