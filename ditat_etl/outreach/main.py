@@ -111,6 +111,7 @@ class Outreach:
 		cls,
 		resource: str,
 		return_as_df: bool=True,
+		verbose: bool=False
 		):
 		"""
 		Get the information about a resource.
@@ -120,7 +121,8 @@ class Outreach:
 			- resource (str): The name of the resource.
 
 		"""
-		print(f"Getting data types about the {resource} resource.")
+		if verbose:
+			print(f"Getting data types about the {resource} resource.")
 
 		url = f'{cls.API_URL}/docs'
 
@@ -434,7 +436,7 @@ class Outreach:
 
 		fields[['name_first', 'name_last']] = fields['name'].str.split(
 			'_', expand=True)
-		
+
 		# Combining the data with the resource information
 		data = {}
 
@@ -444,9 +446,9 @@ class Outreach:
 
 			for _, v in fields[fields['name_first'] == f].iterrows():
 				
-				value = kwargs.get(v['name_last'].lower())
+				value = kwargs.get(v['name_last'].lower()) or kwargs.get(v['name_last'])
 
-				type_ = kwargs.get(f'{v["name_last"].lower()}_type')
+				type_ = kwargs.get(f'{v["name_last"].lower()}_type') or kwargs.get(f'{v["name_last"]}_type')
 
 				if value:
 
