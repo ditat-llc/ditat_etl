@@ -400,7 +400,11 @@ class Outreach:
 			datetime_columns = [c for c in result.columns if c.endswith('At')]
 
 			for c in datetime_columns:
-				result[c] = pd.to_datetime(result[c], format='%Y-%m-%dT%H:%M:%S.000Z')
+				result[c] = pd.to_datetime(
+					result[c],
+					format='%Y-%m-%dT%H:%M:%S.000Z',
+					errors='ignore',
+			)
 
 			# Ids
 			id_columns = [
