@@ -272,6 +272,7 @@ class PeopleDataLabs:
 			results = ex.map(self._read_file_from_s3, lst)
 		dfs = [df for df in results if df is not None]
 
+		dfs = [df for df in dfs if not df.empty]
 
 		# review this
 		fmt = path.split('_')
