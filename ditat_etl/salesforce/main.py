@@ -317,6 +317,7 @@ class SalesforceObj():
 		timeout=None,
 		max_columns=100, # SF limit on columns
 		show_api_usage=False,
+		**kwargs
 		):
 		'''
 		Returns dictionary of the columns requested from the table / SObject specified.
@@ -349,6 +350,8 @@ class SalesforceObj():
 			- max_columns (int, default=100): Maximum number of columns to be queried
 
 			- show_api_usage (bool, default=True): Show API usage
+
+			- **kwargs: Additional arguments to be passed to the query for filtering.
 
 		Returns:
 			- Output format Dict or pd.DataFrame from query
@@ -408,6 +411,19 @@ class SalesforceObj():
 
 			elif date_to:
 				query += f" WHERE {date_window_variable} <= {date_to}"
+
+			if kwargs:
+				for k, v in kwargs.items():
+
+					v = v if isinstance(v, list) else [v]
+
+					operator = 'WHERE' if 'WHERE' not in query else 'AND'
+
+					if len(v) <= 1:
+						query += f" {operator} {k} = '{v[0]}'"
+
+					else:
+						query += f" {operator} {k} IN {tuple(v)}"
 
 			if isinstance(limit, int):
 				query += f' LIMIT {limit}'
@@ -613,6 +629,7 @@ class SalesforceObj():
 		use_parallelism: bool=True,
 		show_api_usage: bool=True,
 		cache_existing_records: bool=False,
+		**kwargs
 		):
 		'''
 		Args:
@@ -655,6 +672,9 @@ class SalesforceObj():
 
 			- cache_existing_records (bool, default=False): Cache existing records
 				to avoid using too many API calls.
+
+			- **kwargs: Additional arguments to pass to the query existing records.
+				Only used if use_parallelism is False
 
 		Returns:
 			- response_payload (dict)
@@ -723,6 +743,7 @@ class SalesforceObj():
 					date_window_variable='LastModifiedDate',
 					verbose=False,
 					include_deleted=False,
+					**kwargs
 				)
 
 			print('Using fresh records from Salesforce')
