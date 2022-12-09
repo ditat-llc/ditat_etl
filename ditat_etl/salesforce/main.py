@@ -746,6 +746,9 @@ class SalesforceObj():
 					**kwargs
 				)
 
+			if sf_df is None:
+				sf_df = pd.DataFrame(columns=columns)
+
 			print('Using fresh records from Salesforce')
 
 		if cache_existing_records:
