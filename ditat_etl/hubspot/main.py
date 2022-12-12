@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+from typing import Union
 
 import requests
 import pandas as pd
@@ -329,6 +330,7 @@ class Hubspot:
 		end_date: str=None,
 		date_fmt: str='%Y/%m/%d',
 		columns: list=None,
+		hs_object_id: Union[str, list]=None,
 		**kwargs
 		):
 		'''
@@ -348,10 +350,13 @@ class Hubspot:
 
 			- date_fmt (str, default='%Y/%m/%d'): Date format.
 
-			- kwargs (dict, default={}): Additional query parameters for filtering
-
 			- columns (list, default=None): List of columns to query. If not provided,
 				all columns will be queried.
+
+			- hs_object_id (str | list, default=None): Hubspot object id(s).
+				** All date filtering will be ignored if this is provided.
+
+			- kwargs (dict): Additional query parameters for filtering
 
 		Returns:
 			
@@ -415,25 +420,38 @@ class Hubspot:
 
 		# Payload
 		data = {
-			'filters': [
-				{
-					'propertyName': date_column,
-					'operator': 'BETWEEN',
-					'value': start_date,
-					'highValue': end_date,
-
-				}
-			],
+			"filters": [],
+			"properties": columns or self.get_object_columns(object_type),
 			"sorts": [
 				{
 					"propertyName": date_column,
 					"direction": "DESCENDING"
 				}
 			],
-			"properties": columns or self.get_object_columns(object_type),
 		}
 
+		if hs_object_id is not None:
+			
+			if isinstance(hs_object_id, str):
+				hs_object_id = [hs_object_id]
+
+			data['filters'].append({
+				'propertyName': 'hs_object_id',
+				'operator': 'IN',
+				'values': hs_object_id,
+			})
+
+		else:
+
+			data['filters'].append({
+					'propertyName': date_column,
+					'operator': 'BETWEEN',
+					'value': start_date,
+					'highValue': end_date,
+			})
+
 		if kwargs:
+
 			for key, value in kwargs.items():
 
 				op_ = 'IN' if isinstance(value, list) else 'EQ'
@@ -460,7 +478,11 @@ class Hubspot:
 		total = result['total']
 		results = result['results']
 
-		print(f"Total {object_type} using {date_column} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
+		if hs_object_id is not None:
+			print(f"Querying {len(results)} records for {object_type} using hs_object_id.")
+
+		else:
+			print(f"Total {object_type} using {date_column} from [{start_date_fmt}] to [{end_date_fmt}]: {total}")
 
 		if total == 0:
 			return None
