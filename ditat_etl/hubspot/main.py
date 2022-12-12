@@ -435,12 +435,14 @@ class Hubspot:
 
 		if kwargs:
 			for key, value in kwargs.items():
+
+				op_ = 'IN' if isinstance(value, list) else 'EQ'
+
 				data['filters'].append(
 					{
 						'propertyName': key,
-						# 'operator': 'IN' if isinstance(value, list) else 'EQ',
-						'operator': 'EQ',
-						'value': value,
+						'operator': op_,
+						'values' if op_ == 'IN' else 'value': value,
 					}
 				)
 
