@@ -1,5 +1,6 @@
 import time
 import json
+from typing import Union, Optional, Dict
 
 from datetime import datetime, timedelta
 import requests
@@ -509,3 +510,40 @@ class Outreach:
 		result = response.json()
 
 		return result
+
+	def request(self, resource: str, method: str = 'POST', data: Optional[Dict] = None) -> Union[Dict, None]:
+		url = f'{self.API_URL}/{resource}'
+
+		for _ in range(10):
+			if not self.access_token:
+				self.token(self.refresh_token)
+				time.sleep(1)
+			else:
+				break
+
+		headers = {'Authorization': f'Bearer {self.access_token}'}
+
+		payload = dict(method=method, url=url, headers=headers)
+
+		if data is not None and method != 'GET':
+			payload['json'] = data
+
+		response = requests.request(**payload)
+
+		if response.status_code == 204:
+			return
+
+		if str(response.status_code)[0] != '2':
+			print(response.text)
+			return
+
+		result = response.json()
+
+		return result
+
+	def delete_resource(self, resource: str, id: int) -> Union[Dict, None]:
+		print(f'Deleting {resource} with id: {id}...')
+		return self.request(f'{resource}/{id}', method='DELETE')
+		
+
+	
