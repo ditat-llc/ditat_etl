@@ -284,7 +284,7 @@ class PeopleDataLabs:
 
 			df = pd.concat(dfs, ignore_index=True)
 			df.sort_values('source', inplace=True, ascending=False)
-			df.drop_duplicates(subset=['pdl_id'], inplace=True)
+			df.drop_duplicates(subset=['index'], inplace=True)
 
 			setattr(self, f'{fmt}_static', df.copy())
 
