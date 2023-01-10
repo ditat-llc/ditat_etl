@@ -374,7 +374,8 @@ class SalesforceObj():
 		if columns is None or not all(item in column_names for item in columns):
 			columns = column_names
 
-		api_usage_before = self.remaining_api_calls
+		if show_api_usage:
+			api_usage_before = self.remaining_api_calls
 
 		# Splitting in chunks
 		chunks = chunker(columns, max_columns - 1)
@@ -457,9 +458,8 @@ class SalesforceObj():
 
 			counter += 1			
 
-		api_usage_after = self.remaining_api_calls
-
 		if show_api_usage:
+			api_usage_after = self.remaining_api_calls
 			print(f'Salesforce API Usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
 
 		if df == False:
@@ -546,13 +546,16 @@ class SalesforceObj():
 			'show_api_usage': [False] * len(chunks),
 		}
 
-		api_usage_before = self.remaining_api_calls
+		if show_api_usage:
+			api_usage_before = self.remaining_api_calls
 
 		with ThreadPoolExecutor() as executor:
 			results = executor.map(self.query, *payload.values())
 		results = [*results]
 
-		api_usage_after = self.remaining_api_calls
+
+		if show_api_usage:
+			api_usage_after = self.remaining_api_calls
 
 		if show_api_usage:
 			print(f'Salesforce API Usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
@@ -705,7 +708,8 @@ class SalesforceObj():
 		)
 
 		# api usage before
-		api_usage_before = self.remaining_api_calls
+		if show_api_usage:
+			api_usage_before = self.remaining_api_calls
 
 		# Droping duplicates
 		dataframe.drop_duplicates(subset=conflict_on, inplace=True)
@@ -920,9 +924,8 @@ class SalesforceObj():
 			if return_response:
 				response_payload['update']['result'] = existing_results
 
-		api_usage_after = self.remaining_api_calls
-
 		if show_api_usage:
+			api_usage_after = self.remaining_api_calls
 			print(f'Salesforce API usage: {api_usage_before - api_usage_after}, remaining: {api_usage_after}')
 
 		return response_payload
