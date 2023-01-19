@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Union, Dict
 
 import requests
 import pandas as pd
@@ -617,17 +617,39 @@ class Hubspot:
 
 		id_ = result['id']
 
-		association_object = self.OBJECTS[association_object]['singular']
-
-		association_type = f"{self.OBJECTS[object_type]['singular']}_to_{association_object}"
-
 		association_id = association_id or result['properties'].get(association_name, {})
 
 		if not association_id:
 			print(f"Could not find association id for {association_name}")
 			return result
 
-		association_url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}/{id_}/associations/{association_object}/{association_id}/{association_type}"
+		association_result = self.associate_record(
+			object_id=id_,
+			object_type=object_type,
+			association_object=association_object,
+			association_id=association_id,
+		)
+
+		result['association'] = association_result
+
+		return result
+		
+	def associate_record(
+		self,
+		object_id: str,
+		object_type: str,
+		association_object: str,
+		association_id: str,
+	) -> Union[Dict, None]:
+		association_object = self.OBJECTS[association_object]['singular']
+		association_type = f"{self.OBJECTS[object_type]['singular']}_to_{association_object}"
+
+		association_url = f"{self.BASE_URL}/crm/{self.VERSION}/objects/{object_type}/{object_id}/associations/{association_object}/{association_id}/{association_type}"
+
+		headers = {
+			'Authorization': f'Bearer {self.api_key}',
+			'Content-Type': 'application/json',
+		}
 
 		association_response = requests.put(association_url, headers=headers)
 
@@ -635,11 +657,8 @@ class Hubspot:
 			print(association_response.text)
 			return None
 
-		association_result = association_response.json()
+		return association_response.json()
 
-		result['association'] = association_result
-
-		return result
 
 
 
