@@ -1,4 +1,5 @@
 import os
+from typing import Optional, List, Union, Dict
 import time
 from datetime import datetime
 import json
@@ -42,17 +43,17 @@ class PeopleDataLabs:
 		self,
 		api_key: str,
 		check_existing: bool=True,
-		client_path: str=None,
-		max_workers: int=30,
-		sandbox: bool=True,
-		aws_access_key_id: str=None,
-		aws_secret_access_key: str=None,
-		s3_bucket_name: str=None,
-		s3_ae_setup: bool=True,
-		s3_pe_setup: bool=True,
-		s3_ps_setup: bool=True,
-		s3_as_setup: bool=False,
-		reprocess_dataframes: bool=False,
+		client_path: Optional[str] = None,
+		max_workers: int = 30,
+		sandbox: bool = True,
+		aws_access_key_id: Optional[str] = None,
+		aws_secret_access_key: Optional[str] = None,
+		s3_bucket_name: Optional[str] = None,
+		s3_ae_setup: bool = True,
+		s3_pe_setup: bool = True,
+		s3_ps_setup: bool = True,
+		s3_as_setup: bool = False,
+		reprocess_dataframes: bool = False,
 	) -> None:
 		'''
 		Args:
@@ -115,14 +116,14 @@ class PeopleDataLabs:
 	@TimeIt()
 	def s3_init(
 		self,
-		bucket_name: str=None,
-		aws_access_key_id: str=None,
-		aws_secret_access_key: str=None,
-		ae_setup: bool=True,
-		pe_setup: bool=True,
-		ps_setup: bool=True,
-		as_setup: bool=True,
-		reuse: bool=True,
+		bucket_name: Optional[str] = None,
+		aws_access_key_id: Optional[str] = None,
+		aws_secret_access_key: Optional[str] = None,
+		ae_setup: bool = True,
+		pe_setup: bool = True,
+		ps_setup: bool = True,
+		as_setup: bool = True,
+		reuse: bool = True,
 	):
 		if self.check_existing is False:
 			return
@@ -182,7 +183,6 @@ class PeopleDataLabs:
 
 				if len(list(df_files)) == 0:
 					existing_df = pd.DataFrame()
-
 				else:
 					df_file = list(df_files)[0].get()['Body'].read().decode('UTF-8')
 
@@ -244,7 +244,7 @@ class PeopleDataLabs:
 			self.i += 1
 
 	### Setting up client's pairs
-	def _pairs(self, path, open_file=False):
+	def _pairs(self, path: str, open_file: bool = False) -> Union[pd.DataFrame, None]:
 		'''
 		Internal method to return pairs 
 		'''
@@ -303,7 +303,7 @@ class PeopleDataLabs:
 
 	@property
 	def pe_pairs(self):
-		return self._pairs(path='person_enrich_pairs')
+		return self._pairs(path='person_enriched_pairs') # Badly named in S3
 		
 	@property
 	def ps_pairs(self):
@@ -330,6 +330,7 @@ class PeopleDataLabs:
 			right_on='pdl_id',
 			how='right'
 		)
+		df.drop_duplicates(subset=['index', 'pdl_id'], inplace=True)
 		return df
 
 	@property
@@ -351,13 +352,13 @@ class PeopleDataLabs:
 
 	def enrich_account(
 		self,
-		min_likelihood: int=5,
-		required=None,
-		save=True,
-		check_existing=True,
-		s3_recalculate=True,
-		index=None,
-		return_response=False,
+		min_likelihood: int = 3,
+		required: Optional[List[str]] = None,
+		save: bool = True,
+		check_existing: bool = True,
+		s3_recalculate: bool = True,
+		index: Optional[str] = None,
+		return_response: bool = False,
 		**kwargs
 	):
 		'''
@@ -577,18 +578,19 @@ class PeopleDataLabs:
 
 	def search_person(
 		self,
-		company_name: str,
 		website: str,
-		required: str='work_email',
-		strategy: str='AND',
-		check_existing: bool=True,
-		return_size: int=1,
-		save: bool=True,
-		s3_recalculate: bool=True,
-		verbose: bool=True,
-		index: str=None,
+		company_name: str,
+		required: str = 'work_email',
+		strategy: str = 'AND',
+		check_existing: bool = True,
+		return_size: int=  1,
+		save: bool = True,
+		s3_recalculate: bool = False,
+		verbose: bool = True,
+		index: Optional[str] = None,
+		enrich: bool = False,
 		**kwargs
-	):
+	) -> Dict:
 		'''
 		Args:
 			
@@ -704,8 +706,6 @@ class PeopleDataLabs:
 					
 					fmt_filename = f"{self.s3_folders['s3_ps']}/{id}.json"
 
-					print(person)
-
 					fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
 
 					self.s3_client.upload_fileobj(
@@ -713,7 +713,6 @@ class PeopleDataLabs:
 						self.bucket_name,
 						fmt_filename
 					)		
-					print(id)
 
 					self.s3_client.upload_fileobj(
 						BytesIO(json.dumps('').encode('UTF-8')),
@@ -722,20 +721,72 @@ class PeopleDataLabs:
 					)		
 
 			if s3_recalculate:
-				self.s3_init()
+				self.s3_init(**self.s3_init_params)
+
+			if enrich:
+				enriched = []
+				for person in response['data']:
+					enrich_resp = self.enrich_person(
+						person['linkedin_url'],
+						save=save,
+						check_existing=check_existing,
+						s3_recalculate=s3_recalculate,
+						index=index
+					)
+					enriched.append(enrich_resp)
+				response['data'] = enriched
 
 		return response
 
+	def enrich_person(
+		self,
+		linkedin_url: str,
+		save: bool = True,
+		check_existing: bool = True,
+		s3_recalculate: bool = False,
+		index: Optional[str] = None
+	) -> Dict:
+		if check_existing and linkedin_url in self.s3_pe.linkedin_url.tolist():
+			print(f"Person already enriched: {linkedin_url}")
+			response = self.s3_pe[
+				self.s3_pe.linkedin_url == linkedin_url
+			].iloc[0].to_dict()
+			# Pending associate index if not in self.s3_pe_client
+			return response
+
+		url = f"{self.base_url}/person/enrich"
+		params = {
+			"api_key": self.api_key,
+			"min_likelihood": 5,
+			"profile": linkedin_url
+		}
+		response = requests.get(url, params=params).json()
+		if response['status'] == 200:
+			if save:
+				self.s3_client.upload_fileobj(
+					BytesIO(json.dumps(response['data']).encode('UTF-8')),
+					self.bucket_name,
+					f"{self.s3_folders['s3_pe']}/{id}.json",
+				)
+				self.s3_client.upload_fileobj(
+					BytesIO(json.dumps('').encode('UTF-8')),
+					self.bucket_name,
+					f"person_enriched_pairs/{self.client_path}__{index}__{response['data']['id']}.json"
+				)		
+		if s3_recalculate:
+			self.s3_init(**self.s3_init_params)
+		return response['data']
+
 	def bulk_search_person(
 		self,
-		account_list: list or pd.DataFrame,
-		required: str='work_email',
-		verbose=False,
-		return_size=1,
+		account_list: Union[list, pd.DataFrame],
+		required: str = 'work_email',
+		verbose: bool = False,
+		return_size: int = 1,
+		enrich: bool = False
 	):
 		'''
 		Args:
-				
 			- account_list (list or pd.DataFrame): List of accounts to search
 
 			- required (str, default='work_email'): Required field
@@ -745,7 +796,6 @@ class PeopleDataLabs:
 			- return_size (int, default=1): Number of results to return
 
 		Returns:
-			
 			- dict: Dictionary with the results
 		'''
 		if isinstance(account_list, pd.DataFrame):
@@ -762,6 +812,7 @@ class PeopleDataLabs:
 				'verbose': verbose,
 				'return_size': return_size,
 				's3_recalculate': False,
+				'enrich': enrich,
 			})
 
 			resp = self.search_person(**payload)
@@ -772,485 +823,6 @@ class PeopleDataLabs:
 
 			time.sleep(type(self).WAIT_TIME)
 
-		self.s3_init()
+		self.s3_init(**self.s3_init_params)
 
 		return results
-
-	# def enrich_person(
-	# 	self,
-	# 	linkedin_url,
-	# 	save=True,
-	# 	s3_recalculate=False,
-	# 	index=None,
-	# ):
-	# 	'check this'
-	#
-	# 	url = f"{self.base_url}/person/enrich"
-	# 	
-	# 	params = {
-	# 		"api_key": self.api_key,
-	# 		"min_likelihood": 5,
-	# 		"profile": linkedin_url
-	# 		# "full_name": full_name,
-	# 		# "job_company_name": job_company_name,
-	# 	}
-	#
-	# 	json_response = requests.get(url, params=params).json()
-	# 	print(json_response)
-	#
-	# 	if json_response["status"] == 200:
-	#
-	# 		data = json_response['data']
-	#
-	# 		id = data['id']
-	#
-	# 		filename = f"{id}.json"
-	#
-	# 		if save and self.check_existing is True:
-	# 			
-	# 			fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
-	# 			fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
-	#
-	# 			self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-	#
-	# 			self.s3_client.upload_fileobj(
-	# 				BytesIO(json.dumps('').encode('UTF-8')),
-	# 				self.bucket_name,
-	# 				f"person_enriched_pairs/{self.client_path}__{index}__{id}.json"
-	# 			)		
-	#
-	# 			if s3_recalculate:
-	# 				self.s3_init(**self.s3_params)
-	#
-	# 		return data
-
-	# def search_person_old(
-	# 	self,
-	# 	required: str='work_email',
-	# 	strategy="AND",
-	# 	return_size=1,
-	# 	check_existing=True,
-	# 	save=True,
-	# 	verbose=True,
-	# 	s3_recalculate=True,
-	# 	**kwargs
-	# ):
-	# 	# Adding new filtering process 
-	# 	s3_ps_filtered = self.s3_ps.copy()
-	#
-	# 	for i, j in kwargs.items():
-	# 		if i not in type(self).PS_COLUMNS:
-	# 			raise ValueError(f"{i} not valid. Check PeopleDataLabs.PERSON_SEARCH_COLUMNS")
-	#
-	# 		else:
-	# 			# Pending case to handle lists and values in lists
-	# 			if i in [
-	# 				'job_title_levels',
-	# 			]:
-	# 				continue
-	# 			
-	# 			elif isinstance(j, list):
-	# 				s3_ps_filtered = s3_ps_filtered[
-	# 					s3_ps_filtered[i].isin([w.lower() for w in j])
-	# 				]
-	#
-	# 			else:
-	# 				s3_ps_filtered = s3_ps_filtered[s3_ps_filtered[i] == j.lower()]
-	#
-	# 	print(f'Existing searched person with these parameters: {s3_ps_filtered.shape[0]}')
-	#
-	# 	if s3_ps_filtered.shape[0] >= 100:
-	# 		raise ValueError('You have to be more specific with the parameters. Add more.')
-	#
-	# 	url = f"{self.base_url}/person/search"
-	#
-	# 	H = {
-	# 	  'Content-Type': "application/json",
-	# 	  'X-api-key': self.api_key
-	# 	}
-	#
-	# 	# SQL query construction
-	# 	sql = f"SELECT * FROM person WHERE"
-	#
-	# 	if kwargs:
-	# 		where_str_list = []
-	#
-	# 		for k, v in kwargs.items():
-	#
-	# 			if isinstance(v, list):
-	# 				v_fmt = ', '.join([f"'{i}'" for i in v])
-	# 				kv_fmt = f"{k} IN ({v_fmt})" 
-	#
-	# 			else:
-	# 				kv_fmt = f"{k} LIKE '%{v}%'"
-	#
-	# 			where_str_list.append(kv_fmt)
-	#
-	# 		where_str = f' {strategy} '.join(where_str_list)
-	#
-	# 		# where_str = f' {strategy} '.join([f"{k} LIKE '%{v}%'" for k, v in kwargs.items()])
-	# 		sql += ' '
-	# 		sql += where_str
-	#
-	# 	if required:
-	# 		if kwargs:
-	# 			sql += ' AND'
-	# 		sql += f' {required} IS NOT NULL'
-	#
-	# 	if check_existing and self.check_existing_method == 'local':
-	# 		existing = self.aggregate(dir_type='person_search')
-	# 		if existing is not None:
-	# 			existing = existing['work_email'].tolist()
-	# 			existing_str =  ' AND work_email NOT IN (' + ', '.join([f"'{i}'" for i in existing]) + ')'
-	# 			sql += existing_str
-	#
-	# 	elif check_existing and self.check_existing_method == 's3':
-	# 		if hasattr(self, 's3_ps') and s3_ps_filtered.shape[0] > 0:
-	# 			existing = s3_ps_filtered['work_email'].tolist()
-	# 			existing_str =  ' AND work_email NOT IN (' + ', '.join([f"'{i}'" for i in existing]) + ')'
-	# 			sql += existing_str
-	#
-	# 	if verbose:
-	# 		print(sql)
-	#
-	# 	P = {
-	# 	  'sql': sql,
-	# 	  'size': return_size,
-	# 	  'pretty': True
-	# 	}
-	#
-	# 	response = requests.get(
-	# 	  url,
-	# 	  headers=H,
-	# 	  params=P
-	# 	).json()
-	#
-	# 	if verbose:
-	# 		print(f"Status Code {response['status']}")
-	#
-	# 	if response['status'] == 200:
-	# 		for person in response['data']:
-	# 			id = person['id']
-	#
-	# 			if save and self.check_existing_method == 'local':
-	# 				with open(f'person_search/{id}.json', 'w') as out:
-	# 					out.write(json.dumps(person))
-	#
-	# 			elif save and self.check_existing_method == 's3':
-	# 				fmt_filename = f"{self.s3_folders['s3_ps']}/{id}.json"
-	# 				fmt_file = BytesIO(json.dumps(person).encode('UTF-8'))
-	# 				self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-	#
-	# 		if s3_recalculate:
-	# 			self.s3_setup(**self.s3_params)
-	#
-	# 	return response
-
-	# def enrich_person_old(
-	# 	self,	 
-	# 	min_likelihood: int=2,
-	# 	required=None,
-	# 	save=True,
-	# 	check_existing=True,
-	# 	s3_recalculate=True,
-	# 	verbose=True,
-	# 	**kwargs
-	# ):
-	# 	# Checking minimum fields.
-	# 	required_fields = {
-	# 		'profile': ['linkedin_url', 'facebook_url', 'twitter_url'],
-	# 		'email': ['email', 'personal_emails', 'emails'],
-	# 		'phone': ['phone']
-	# 	}
-	#
-	# 	if not any(i in required_fields for i in kwargs):
-	# 		if all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
-	# 			pass
-	# 		else:
-	# 			raise ValueError(f'You need to specify at least one of {required_fields}')
-	#
-	# 	# Process to check if file company has already been enriched.
-	# 	if check_existing and self.check_existing == 'local':
-	# 		existing_files = []
-	# 		existing_filenames =[f"person_enrichment/{i}" for i in os.listdir('person_enrichment')] 
-	# 		for file in existing_filenames:
-	# 			with open(file, 'r') as f:
-	# 				file_data = json.loads(f.read())
-	# 				existing_files.append(file_data)
-	#
-	# 		for existing_file in existing_files:
-	# 			if 'email' in kwargs:
-	# 				if required == existing_file['work_email'] or required in existing_file['personal_emails']: # Add emails
-	# 					print(f"Email already exists.")
-	# 					return None
-	#
-	# 			elif 'profile' in kwargs:
-	# 				for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
-	# 					if required == existing_file[profile]:
-	# 						print(f"Profile already exists.")
-	# 						return None
-	#
-	# 			elif 'phone' in kwargs:
-	# 				if required == existing_file['mobile_phone'] or required in existing_file['phone_numbers']:
-	# 					print(f"Phone already exists.")
-	# 					return None
-	# 			else:
-	# 				pass
-	# 				# Pending for combo first_name, last_name and company
-	#
-	#
-	# 	elif check_existing and self.check_existing is True:
-	# 		if hasattr(self, 's3_pe'):
-	# 			if 'email' in kwargs:
-	# 				d = kwargs['email']
-	# 				if d in self.s3_pe['work_email'].values \
-	# 				or self.s3_pe['personal_emails'].astype(str).str.contains(d).any() \
-	# 				or self.s3_pe['emails'].astype(str).str.contains(d).any():
-	# 					print(f"Email already exists.")
-	# 					return None
-	#
-	# 			elif 'profile' in kwargs:
-	# 				d = kwargs['profile']
-	# 				for profile in ['facebook_url', 'linkedin_url', 'twitter_url', 'github_url']:
-	# 					if d in self.s3_pe[profile].values:
-	# 						print(f"Profile already exists.")
-	# 						return None
-	#
-	# 			elif 'phone' in kwargs:
-	# 				d = kwargs['phone']
-	# 				if d in self.s3_pe['mobile_phone'].values or self.s3_pe['phone_numbers'].astype(str).str.contains(d).any():
-	# 					print(f"Phone already exists.")
-	# 					return None
-	#
-	# 			elif all(i in ['first_name', 'last_name', 'company'] for i in kwargs):
-	# 				filtered_df = self.s3_pe.loc[ 
-	# 					(self.s3_pe['first_name'] == kwargs['first_name'].lower())
-	# 					& (self.s3_pe['last_name'] == kwargs['last_name'].lower())
-	# 					& (self.s3_pe['job_company_name'] == kwargs['company'].lower())
-	# 				]
-	# 				if filtered_df.shape[0] > 0:
-	# 					print('first_name, last_name, company already exists.')
-	# 					return None
-	#
-	# 	url = f"{self.base_url}/person/enrich"
-	#
-	# 	params = {
-	# 		"api_key": self.api_key,
-	# 		"min_likelihood": min_likelihood,
-	# 		"required": required
-	# 	}
-	# 	params.update(kwargs)
-	#
-	# 	json_response = requests.get(url, params=params).json()
-	#
-	# 	if verbose and json_response['status'] != 200:
-	# 		print(json_response)
-	#
-	# 	if json_response["status"] == 200:
-	# 		data = json_response['data']
-	# 		filename = f"{json_response['data']['id']}.json"
-	#
-	# 		if save and self.check_existing == 'local':
-	# 			with open(os.path.join('person_enrichment', f"{filename}"), 'w') as out:
-	# 				out.write(json.dumps(data))
-	#
-	# 		elif save and self.check_existing is True:
-	# 			fmt_filename = f"{self.s3_folders['s3_pe']}/{filename}"
-	# 			fmt_file = BytesIO(json.dumps(data).encode('UTF-8'))
-	#
-	# 			self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-	#
-	# 			if s3_recalculate:
-	# 				self.s3_init(**self.s3_params)
-	#
-	# 		return data
-	#
-	# # def to_db(self, tablename:str, db_config: dict=None, conflict_on: str='domain'):
-	# # 	'''
-	# # 	For now the 2 dataframes that are pushed to the DB are:
-	# # 		i. self.s3_ae
-	# # 		ii. self.s3_as 
-	# # 	'''
-	# # 	column_mapping = {
-	# # 		'name': 'name',
-	# # 		'employee_count': 'employee_count',
-	# # 		'founded': 'founded',
-	# # 		'industry': 'industry',
-	# # 		'linkedin_url': 'linkedin_url',
-	# # 		'facebook_url': 'facebook_url',
-	# # 		'twitter_url': 'twitter_url',
-	# # 		'website': 'website',
-	# # 		'ticker': 'ticker',
-	# # 		'type': 'type',
-	# # 		'tags': 'tags',
-	# # 		'alternative_names': 'alternative_names',
-	# # 		'location.locality': 'city',
-	# # 		'location.region': 'state',
-	# # 		'location.country': 'country',
-	# # 		'location.street_address': 'street',
-	# # 		'location.postal_code': 'zip',
-	# # 	}
-	# # 	self.db = Postgres(db_config)
-	# # 	
-	# # 	# Account Enrichment Processing 
-	# # 	if hasattr(self, 's3_ae'):
-	# # 		print(f'Pushing self.s3_ae to table: {tablename}')
-	# # 		s3_ae_db = self.s3_ae.copy()
-	# # 		s3_ae_db.rename(columns=column_mapping, inplace=True)
-	# # 		s3_ae_db = s3_ae_db[column_mapping.values()]
-	# #
-	# # 		s3_ae_db['domain'] = s3_ae_db['website'].apply(extract_domain)
-	# # 		s3_ae_db = s3_ae_db.loc[(s3_ae_db['domain'] != 'nan') | (~s3_ae_db['domain'].isnull()), :]
-	# # 		s3_ae_db.dropna(subset=['domain'], inplace=True)
-	# #
-	# # 		s3_ae_db['data_source'] = 'people_data_labs'
-	# #
-	# # 		self.db.insert_df_to_sql(
-	# # 			df=s3_ae_db,
-	# # 			tablename=tablename,
-	# # 			commit=True,
-	# # 			conflict_on=conflict_on,
-	# # 			do_update_columns=False,
-	# # 			verbose=False
-	# # 		)
-	# # 	# Account Search Processing
-	# # 	if hasattr(self, 's3_as'):
-	# # 		print(f'Pushing self.s3_as to table: {tablename}')
-	# # 		s3_as_db = self.s3_as.copy()
-	# # 		s3_as_db.rename(columns=column_mapping, inplace=True)
-	# # 		s3_as_db = s3_as_db[column_mapping.values()]
-	# #
-	# # 		s3_as_db['domain'] = s3_as_db['website'].apply(extract_domain)
-	# # 		s3_as_db = s3_as_db.loc[(s3_as_db['domain'] != 'nan') | (~s3_as_db['domain'].isnull()), :]
-	# # 		s3_as_db.dropna(subset=['domain'], inplace=True)
-	# #
-	# # 		s3_as_db['data_source'] = 'people_data_labs'
-	# #
-	# # 		self.db.insert_df_to_sql(
-	# # 			df=s3_as_db,
-	# # 			tablename=tablename,
-	# # 			commit=True,
-	# # 			conflict_on=conflict_on,
-	# # 			do_update_columns=False,
-	# # 			verbose=False
-	# # 		)
-	#
-	# # def aggregate(self, dir_type: str):
-	# # 	if dir_type not in type(self).SAVE_DIRS:
-	# # 		raise ValueError('Not a valid dir_type. Check PeopleDataLabs.SAVE_DIRS')
-	# #
-	# # 	files = os.listdir(dir_type)
-	# #
-	# # 	dfs = []
-	# #    
-	# # 	for file in files:
-	# # 		path = os.path.join(dir_type, file)
-	# # 		with open(path, 'r') as f:
-	# # 			file = json.loads(f.read())
-	# #
-	# # 		df = pd.json_normalize(file)
-	# # 		dfs.append(df)
-	# #
-	# # 	if not dfs:
-	# # 		return None
-	# # 	agg = pd.concat(dfs, axis=0, ignore_index=True)
-	# # 	return agg
-	#
-
-	#
-	#
-	# def search_account(
-	# 	self,
-	# 	required: str=None,
-	# 	strategy='AND',
-	# 	return_size=1,
-	# 	check_existing=True,
-	# 	save=True,
-	# 	verbose=True,
-	# 	s3_recalculate=True,
-	# 	**kwargs,
-	# ):
-	# 	# Adding new filtering process 
-	# 	s3_as_filtered = self.s3_as.copy()
-	#
-	# 	for i, j in kwargs.items():
-	# 		if i in s3_as_filtered.columns:
-	# 			s3_as_filtered = s3_as_filtered[s3_as_filtered[i] == j.lower()]
-	#
-	# 	print(f'Existing searched accounts with these parameters: {s3_as_filtered.shape[0]}')
-	#
-	# 	if s3_as_filtered.shape[0] >= 100:
-	# 		raise ValueError('You have to be more specific with the parameters. Add more.')
-	#
-	# 	url = f"{self.base_url}/company/search"
-	#
-	# 	H = {
-	# 	  'Content-Type': "application/json",
-	# 	  'X-api-key': self.api_key
-	# 	}
-	#
-	# 	# SQL query construction
-	# 	sql = f"SELECT * FROM company WHERE"
-	#
-	# 	if kwargs:
-	# 		where_str = f' {strategy} '.join(
-	# 			[f"{k} = '{v}'" for k, v in kwargs.items()]
-	# 		)
-	# 		sql += ' '
-	# 		sql += where_str
-	#
-	# 	if required:
-	# 		if kwargs:
-	# 			sql += ' AND'
-	# 		sql += f' {required} IS NOT NULL'
-	#
-	# 	if check_existing and self.check_existing_method == 'local':
-	# 		existing = self.aggregate(dir_type='account_search')
-	# 		if existing is not None:
-	# 			existing = existing.website.tolist()
-	# 			existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
-	# 			sql += existing_str
-	#
-	# 	elif check_existing and self.check_existing_method == 's3':
-	# 		if hasattr(self, 's3_as') and s3_as_filtered.shape[0] > 0:
-	# 			existing = s3_as_filtered.website.unique().tolist()
-	# 			existing_str =  ' AND website NOT IN (' + ', '.join([f"'{website}'" for website in existing]) + ')'
-	# 			sql += existing_str
-	#
-	# 	if verbose:
-	# 		print(sql)
-	#
-	# 	P = {
-	# 	  'sql': sql,
-	# 	  'size': return_size,
-	# 	  'pretty': True
-	# 	}
-	#
-	# 	response = requests.get(
-	# 	  url,
-	# 	  headers=H,
-	# 	  params=P
-	# 	).json()
-	#
-	#    # if verbose:
-	# 	#	 print(response)
-	#
-	# 	if response['status'] == 200:
-	# 		for company in response['data']:
-	# 			id = company['id']
-	#
-	# 			if save and self.check_existing_method == 'local':
-	# 				with open(f'account_search/{id}.json', 'w') as out:
-	# 					out.write(json.dumps(company))
-	#
-	# 			elif save and self.check_existing_method == 's3':
-	# 				fmt_filename = f"{self.s3_folders['s3_as']}/{company['id']}.json"
-	# 				fmt_file = BytesIO(json.dumps(company).encode('UTF-8'))
-	# 				self.s3_client.upload_fileobj(fmt_file, self.bucket_name, fmt_filename)		
-	#
-	# 		if s3_recalculate:
-	# 			self.s3_setup(**self.s3_params)
-	#
-	# 		return response['data']
-	# 
-	#
