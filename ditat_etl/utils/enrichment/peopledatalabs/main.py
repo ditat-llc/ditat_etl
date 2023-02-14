@@ -579,7 +579,7 @@ class PeopleDataLabs:
 	def search_person(
 		self,
 		website: str,
-		company_name: str,
+		company_name: Optional[str] = None,
 		required: str = 'work_email',
 		strategy: str = 'AND',
 		check_existing: bool = True,
@@ -588,7 +588,6 @@ class PeopleDataLabs:
 		s3_recalculate: bool = False,
 		verbose: bool = True,
 		index: Optional[str] = None,
-		enrich: bool = False,
 		**kwargs
 	) -> Dict:
 		'''
@@ -626,8 +625,11 @@ class PeopleDataLabs:
 			if i not in type(self).PS_RESULT_COLUMNS:
 				raise ValueError(f"{i} not valid. Check PeopleDataLabs.PS_RESULT_COLUMNS")
 
-		kwargs['job_company_name'] = company_name.lower()
-		kwargs['job_company_website'] = extract_domain(website)
+		if company_name:
+			kwargs['job_company_name'] = company_name.lower()
+
+		website = extract_domain(website).lower() if extract_domain(website) else None
+		kwargs['job_company_website'] = website 
 
 		url = f"{self.base_url}/person/search"
 
@@ -667,13 +669,18 @@ class PeopleDataLabs:
 		if check_existing and self.check_existing is True:
 			if hasattr(self, 's3_ps') and self.s3_ps.shape[0] > 0:
 
-				existing = self.s3_ps.loc[
-					self.s3_ps['job_company_name'].str.lower().str.contains(company_name.lower()),
-					['full_name']
-				]
+				if company_name:
+					existing = self.s3_ps.loc[
+						self.s3_ps['job_company_name'].str.lower().str.contains(company_name.lower()),
+						['full_name']
+					]
+				else:
+					existing = self.s3_ps.loc[
+						self.s3_ps['job_company_website'] == website,
+						['full_name']
+					]
 
 				if not existing.empty:
-
 					existing = tuple(existing['full_name'])
 
 					if len(existing) == 1:
@@ -721,20 +728,7 @@ class PeopleDataLabs:
 					)		
 
 			if s3_recalculate:
-				self.s3_init(**self.s3_init_params)
-
-			if enrich:
-				enriched = []
-				for person in response['data']:
-					enrich_resp = self.enrich_person(
-						person['linkedin_url'],
-						save=save,
-						check_existing=check_existing,
-						s3_recalculate=s3_recalculate,
-						index=index
-					)
-					enriched.append(enrich_resp)
-				response['data'] = enriched
+				self.s3_init()
 
 		return response
 
@@ -766,7 +760,7 @@ class PeopleDataLabs:
 				self.s3_client.upload_fileobj(
 					BytesIO(json.dumps(response['data']).encode('UTF-8')),
 					self.bucket_name,
-					f"{self.s3_folders['s3_pe']}/{id}.json",
+					f"{self.s3_folders['s3_pe']}/{response['data']['id']}.json",
 				)
 				self.s3_client.upload_fileobj(
 					BytesIO(json.dumps('').encode('UTF-8')),
@@ -774,7 +768,7 @@ class PeopleDataLabs:
 					f"person_enriched_pairs/{self.client_path}__{index}__{response['data']['id']}.json"
 				)		
 		if s3_recalculate:
-			self.s3_init(**self.s3_init_params)
+			self.s3_init()
 		return response['data']
 
 	def bulk_search_person(
