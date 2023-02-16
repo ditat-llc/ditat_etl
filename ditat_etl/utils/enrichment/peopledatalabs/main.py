@@ -580,7 +580,7 @@ class PeopleDataLabs:
 		self,
 		website: str,
 		company_name: Optional[str] = None,
-		required: str = 'work_email',
+		required: Union[str, List[str]] = 'work_email',
 		strategy: str = 'AND',
 		check_existing: bool = True,
 		return_size: int=  1,
@@ -662,9 +662,11 @@ class PeopleDataLabs:
 			sql += where_str
 
 		if required:
+			required = required if isinstance(required, list) else [required]
+			required_str = ' AND '.join([f"{i} IS NOT NULL" for i in required])
 			if kwargs:
-				sql += ' AND'
-			sql += f' {required} IS NOT NULL'
+				required_str = f' AND {required_str}'
+			sql += required_str
 
 		if check_existing and self.check_existing is True:
 			if hasattr(self, 's3_ps') and self.s3_ps.shape[0] > 0:
